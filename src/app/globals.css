@@ -1,48 +1,168 @@
 @import "tailwindcss";
 
+/* ──────────────────────────────────────────────────────────────
+   PressBook 360 design tokens — mirrored from the existing CRM
+   (crm.myrealtyline.com) so the new app matches visually.
+   ────────────────────────────────────────────────────────────── */
+
 :root {
-  /* PressBook 360 brand palette */
-  --pb-navy: #021D40;
-  --pb-plum: #3D0740;
-  --pb-red: #DB1924;
-  --pb-green: #10B981;
-  --pb-amber: #F59E0B;
+  /* PressBook brand palette (unchanged) */
+  --pb-navy:  #021D40;
+  --pb-plum:  #3D0740;
+  --pb-red:   #DB1924;
+  --pb-green: #50cd89;
+  --pb-amber: #ffc700;
 
-  /* App tokens */
-  --background: #F8F9FB;
-  --foreground: #323A46;
-  --card: #FFFFFF;
-  --muted: #6B7280;
-  --border: #E5E7EB;
-  --accent: var(--pb-navy);
-  --accent-foreground: #FFFFFF;
+  /* Semantic colors */
+  --primary:      var(--pb-navy);
+  --success:      #50cd89;
+  --danger:       var(--pb-red);
+  --destructive:  var(--pb-red);
+  --warning:      #ffc700;
+  --info:         #009ef7;
+  --overlay:      rgba(0, 0, 0, .5);
+  --overlay-light: rgba(0, 0, 0, .4);
 
-  --sidebar-width: 260px;
+  /* Radii */
+  --r:      4px;      /* default corner radius */
+  --rlg:    6px;      /* large cards */
+  --rfull:  9999px;   /* pills / badges */
+
+  /* Shadows */
+  --sh-xs: 0 1px 3px 0 rgba(0, 0, 0, .1), 0 1px 2px -1px rgba(0, 0, 0, .1);
+  --sh-sm: 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -2px rgba(0, 0, 0, .1);
+  --sh-md: 0 4px 6px -1px rgba(0, 0, 0, .1), 0 2px 4px -2px rgba(0, 0, 0, .1);
+  --sh-lg: 0 10px 15px -3px rgba(0, 0, 0, .1), 0 4px 6px -4px rgba(0, 0, 0, .1);
+
+  /* Layout */
+  --sidebar-width: 240px;
+  --header-h: 60px;
+
+  /* ── Light theme (default) ──────────────────────────────── */
+  --bg:          #f9fbfd;
+  --surface:     #ffffff;
+  --surface2:    #f9fbfd;
+  --card:        #ffffff;
+  --muted:       rgba(50, 58, 70, .04);
+  --muted2:      rgba(50, 58, 70, .07);
+  --border:      rgba(50, 58, 70, .1);
+  --border2:     rgba(50, 58, 70, .18);
+  --text:        #323a46;     /* primary text */
+  --text2:       #94989a;     /* secondary / muted text */
+  --text3:       #bfc4cc;     /* tertiary / disabled */
+  --accent:      var(--pb-navy);
+  --accent-foreground: #ffffff;
+
+  /* Aliases for older code paths */
+  --background:  var(--bg);
+  --foreground:  var(--text);
 }
 
+:root[data-theme="dark"] {
+  --bg:          #151515;
+  --surface:     #1f1f1f;
+  --surface2:    #2a2a2a;
+  --card:        #1f1f1f;
+  --muted:       rgba(255, 255, 255, .04);
+  --muted2:      rgba(255, 255, 255, .07);
+  --border:      #343331;
+  --border2:     rgba(255, 255, 255, .14);
+  --text:        #ffffff;
+  --text2:       #767273;
+  --text3:       #4a4648;
+}
+
+/* Tailwind v4: expose the tokens as utility classes */
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-card: var(--card);
-  --color-muted: var(--muted);
-  --color-border: var(--border);
-  --color-accent: var(--accent);
-  --color-accent-foreground: var(--accent-foreground);
-  --color-pb-navy: var(--pb-navy);
-  --color-pb-plum: var(--pb-plum);
-  --color-pb-red: var(--pb-red);
-  --color-pb-green: var(--pb-green);
-  --color-pb-amber: var(--pb-amber);
+  --color-background:         var(--bg);
+  --color-foreground:          var(--text);
+  --color-card:                var(--card);
+  --color-surface:             var(--surface);
+  --color-surface-2:           var(--surface2);
+  --color-muted:               var(--text2);
+  --color-muted-bg:            var(--muted);
+  --color-muted-bg-2:          var(--muted2);
+  --color-border:              var(--border);
+  --color-border-strong:       var(--border2);
+  --color-text:                var(--text);
+  --color-text-2:              var(--text2);
+  --color-text-3:              var(--text3);
+  --color-accent:              var(--accent);
+  --color-accent-foreground:   var(--accent-foreground);
+  --color-pb-navy:             var(--pb-navy);
+  --color-pb-plum:             var(--pb-plum);
+  --color-pb-red:              var(--pb-red);
+  --color-pb-green:            var(--pb-green);
+  --color-pb-amber:            var(--pb-amber);
+  --color-success:             var(--success);
+  --color-danger:              var(--danger);
+  --color-warning:             var(--warning);
+  --color-info:                var(--info);
+  --radius-sm:  var(--r);
+  --radius-md:  var(--rlg);
+  --radius-full: var(--rfull);
+  --shadow-xs: var(--sh-xs);
+  --shadow-sm: var(--sh-sm);
+  --shadow-md: var(--sh-md);
+  --shadow-lg: var(--sh-lg);
+}
+
+/* ──────────────────────────────────────────────────────────────
+   Base / Body
+   ────────────────────────────────────────────────────────────── */
+html {
+  color-scheme: light;
+}
+html[data-theme="dark"] {
+  color-scheme: dark;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    var(--font-inter),
+    "Cerebri Sans",
+    -apple-system,
+    BlinkMacSystemFont,
+    "Segoe UI",
+    Arial,
+    sans-serif;
+  font-size: 14px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
 }
 
-/* Scrollbar styling */
-::-webkit-scrollbar { width: 6px; }
-::-webkit-scrollbar-track { background: transparent; }
-::-webkit-scrollbar-thumb { background: #D1D5DB; border-radius: 3px; }
-::-webkit-scrollbar-thumb:hover { background: #9CA3AF; }
+/* Scrollbar (matches existing CRM) */
+::-webkit-scrollbar         { width: 6px; height: 6px; }
+::-webkit-scrollbar-track   { background: transparent; }
+::-webkit-scrollbar-thumb   { background: var(--border2); border-radius: 3px; }
+::-webkit-scrollbar-thumb:hover { background: var(--text3); }
+
+/* Auth hero animation (preserved from earlier work) */
+@keyframes pb-hero-glow {
+  0%   { transform: translate(0, 0); }
+  100% { transform: translate(-5%, 5%); }
+}
+
+.pb-auth-hero {
+  background: linear-gradient(135deg, var(--pb-navy) 0%, #0a2b5c 40%, var(--pb-plum) 100%);
+  position: relative;
+  overflow: hidden;
+}
+
+.pb-auth-hero::before {
+  content: "";
+  position: absolute;
+  top: -50%; left: -50%;
+  width: 200%; height: 200%;
+  background:
+    radial-gradient(circle at 30% 50%, rgba(59, 130, 246, 0.15) 0%, transparent 50%),
+    radial-gradient(circle at 70% 80%, rgba(219, 25, 36, 0.10) 0%, transparent 40%);
+  animation: pb-hero-glow 15s ease-in-out infinite alternate;
+}
+
+.pb-auth-hero > * {
+  position: relative;
+  z-index: 1;
+}

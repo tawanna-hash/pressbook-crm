@@ -46,26 +46,79 @@ export const users = pgTable("users", {
   name: varchar("name", { length: 255 }).notNull(),
   email: varchar("email", { length: 255 }).notNull(),
   avatarUrl: text("avatar_url"),
+  // Booking settings (per user)
+  publicBookingUrl: varchar("public_booking_url", { length: 500 }),
+  meetingDurationMinutes: integer("meeting_duration_minutes").default(30),
+  meetingLocation: varchar("meeting_location", { length: 255 }),
+  bookingBio: text("booking_bio"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
+
+// ── Booking org settings ──────────────────────────────────────
+export const bookingOrgSettings = pgTable("booking_org_settings", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().unique().references(() => organizations.id),
+  publicBookingUrl: varchar("public_booking_url", { length: 500 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// ── Availability slots ────────────────────────────────────────
+export const availabilitySlots = pgTable("availability_slots", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id),
+  userId: uuid("user_id").references(() => users.id),
+  dayOfWeek: integer("day_of_week").notNull(), // 0=Sun … 6=Sat
+  startTime: varchar("start_time", { length: 5 }).notNull(),
+  endTime: varchar("end_time", { length: 5 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// Shape of an entry in `contacts.additionalContacts`.
+export type AdditionalContact = {
+  firstName: string;
+  lastName: string;
+  email: string;
+  title: string;
+  phone: string;
+};
 
 // ── Contacts ──────────────────────────────────────────────────
 export const contacts = pgTable("contacts", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").notNull().references(() => organizations.id),
   type: contactTypeEnum("type").notNull().default("client"),
+  // Portal linkage
+  clerkId: varchar("clerk_id", { length: 255 }).unique(),
+  portalActivatedAt: timestamp("portal_activated_at"),
+  // Client relationship status — drives portal gate and list filtering.
+  status: varchar("status", { length: 20 }).default("prospect"),
+  // Primary contact person
+  avatarUrl: text("avatar_url"),                     // base64 data URL or https://… URL
   firstName: varchar("first_name", { length: 255 }).notNull(),
   lastName: varchar("last_name", { length: 255 }),
-  email: varchar("email", { length: 255 }),
-  phone: varchar("phone", { length: 50 }),
+  email: varchar("email", { length: 255 }),          // Primary business email
+  portalEmail: varchar("portal_email", { length: 255 }), // Email used for portal login (may differ)
+  phone: varchar("phone", { length: 50 }),           // Mobile
+  officePhone: varchar("office_phone", { length: 50 }),
+  website: varchar("website", { length: 500 }),
   company: varchar("company", { length: 255 }),
   title: varchar("title", { length: 255 }),
+  industry: varchar("industry", { length: 100 }),
+  licenseNumber: varchar("license_number", { length: 100 }),
+  // Mailing address
   address: text("address"),
+  address2: varchar("address_2", { length: 255 }),
   city: varchar("city", { length: 100 }),
   state: varchar("state", { length: 50 }),
   zip: varchar("zip", { length: 20 }),
+  // Email verification signal
   emailStatus: emailStatusEnum("email_status"),
   emailVerifiedAt: timestamp("email_verified_at"),
+  // Secondary and tertiary contacts at the same account, stored as JSON.
+  additionalContacts: jsonb("additional_contacts")
+    .$type<AdditionalContact[]>()
+    .default([]),
   notes: text("notes"),
   tags: jsonb("tags").$type<string[]>().default([]),
   createdAt: timestamp("created_at").notNull().defaultNow(),
@@ -157,12 +210,90 @@ export const emailVerifications = pgTable("email_verifications", {
 export const calendarEvents = pgTable("calendar_events", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").notNull().references(() => organizations.id),
+  // Optional link to a client contact — appointments with a contact_id
+  // show up in Calendarly; unlinked events show in the general Calendar.
+  contactId: uuid("contact_id").references(() => contacts.id),
   title: varchar("title", { length: 500 }).notNull(),
   date: timestamp("date").notNull(),
   endDate: timestamp("end_date"),
+  durationMinutes: integer("duration_minutes"),
+  location: varchar("location", { length: 255 }),
   type: varchar("type", { length: 100 }),
   notes: text("notes"),
+  // Free-text fields used by Team Calendar entries (non-linked)
+  clientName: varchar("client_name", { length: 255 }),
+  agentEmail: varchar("agent_email", { length: 255 }),
   createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ── Industry Events ───────────────────────────────────────────
+// External events the team wants to track: conferences, CE courses, expos,
+// networking, etc. Not the same as calendar_events (team/client meetings).
+export type ExtraDateTime = { startAt: string; endAt: string | null };
+
+export const industryEvents = pgTable("industry_events", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id),
+  title: varchar("title", { length: 500 }).notNull(),
+  description: text("description"),
+  allDay: boolean("all_day").notNull().default(false),
+  startAt: timestamp("start_at"),
+  endAt: timestamp("end_at"),
+  extraDateTimes: jsonb("extra_date_times").$type<ExtraDateTime[]>().default([]),
+  // Venue / address
+  venueName: varchar("venue_name", { length: 255 }),
+  address: text("address"),
+  address2: varchar("address_2", { length: 255 }),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 50 }),
+  zip: varchar("zip", { length: 20 }),
+  // Pricing + licensing (real-estate CE course context)
+  websiteUrl: varchar("website_url", { length: 500 }),
+  memberPriceCents: integer("member_price_cents"),
+  nonMemberPriceCents: integer("non_member_price_cents"),
+  courseNumber: varchar("course_number", { length: 100 }),
+  trecLicenseNumber: varchar("trec_license_number", { length: 100 }),
+  // Classification
+  category: varchar("category", { length: 255 }),
+  organizer: varchar("organizer", { length: 255 }),
+  tags: jsonb("tags").$type<string[]>().default([]),
+  // Team integration
+  pushToTeamCalendar: boolean("push_to_team_calendar").notNull().default(false),
+  eventColor: varchar("event_color", { length: 7 }).default("#3D0740"),
+  linkedCalendarEventId: uuid("linked_calendar_event_id").references(
+    () => calendarEvents.id,
+  ),
+  createdBy: uuid("created_by").references(() => users.id),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const industryEventCategories = pgTable("industry_event_categories", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  parentId: uuid("parent_id"),
+  isParent: boolean("is_parent").notNull().default(false),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const industryEventOrganizers = pgTable("industry_event_organizers", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id),
+  name: varchar("name", { length: 255 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+export const industryEventLocations = pgTable("industry_event_locations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id),
+  venueName: varchar("venue_name", { length: 255 }).notNull(),
+  address: text("address"),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 50 }),
+  zip: varchar("zip", { length: 20 }),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
