@@ -8,6 +8,7 @@ import {
   Plus,
   X,
 } from "lucide-react";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { createTeamEvent, type TeamEventFormState } from "./actions";
 
 const INITIAL: TeamEventFormState = { ok: false, message: "" };
@@ -66,14 +67,15 @@ export function NewTeamEventButton({
 
   return (
     <>
-      <button
+      <Button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-pb-navy px-3.5 py-2 text-[13px] font-semibold text-white shadow-[var(--sh-xs)] transition-opacity hover:opacity-90"
+        variant="primary"
+        size="md"
+        leftIcon={<Plus className="h-3.5 w-3.5" />}
       >
-        <Plus className="h-3.5 w-3.5" />
         New
-      </button>
+      </Button>
 
       {open && (
         <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/40 p-4 sm:p-8">
@@ -83,14 +85,15 @@ export function NewTeamEventButton({
                 <CalendarPlus className="h-4 w-4 text-pb-navy" />
                 <h2 className="text-base font-semibold text-text">New Event</h2>
               </div>
-              <button
+              <Button
                 type="button"
                 onClick={() => setOpen(false)}
                 aria-label="Close"
-                className="rounded-full p-1.5 text-text-2 hover:bg-muted-bg hover:text-text"
+                variant="ghost"
+                size="icon"
               >
                 <X className="h-4 w-4" />
-              </button>
+              </Button>
             </div>
 
             <form
@@ -293,20 +296,22 @@ export function NewTeamEventButton({
                   <span />
                 )}
                 <div className="flex items-center gap-2">
-                  <button
+                  <Button
                     type="button"
                     onClick={() => setOpen(false)}
-                    className="rounded-[var(--r)] border border-border bg-card px-4 py-2 text-[13px] font-medium text-text transition-colors hover:bg-muted-bg"
+                    variant="secondary"
+                    size="md"
                   >
                     Cancel
-                  </button>
-                  <button
+                  </Button>
+                  <Button
                     type="submit"
                     disabled={pending}
-                    className="rounded-[var(--r)] bg-pb-navy px-5 py-2 text-[13px] font-semibold text-white shadow-[var(--sh-xs)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                    variant="primary"
+                    size="md"
                   >
                     {pending ? "Saving…" : "Schedule"}
-                  </button>
+                  </Button>
                 </div>
               </div>
             </form>

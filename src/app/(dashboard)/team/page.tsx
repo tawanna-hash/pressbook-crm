@@ -181,15 +181,6 @@ export default async function TeamCalendarPage({
             </Link>
           </div>
 
-          <ImportTeamCalendarButton />
-          <NewTeamEventButton
-            orgs={orgs.map((o) => ({
-              slug: o.slug,
-              name: o.name,
-              brandColor: o.brandColor,
-            }))}
-            defaultOrgSlug={active?.slug ?? orgs[0]?.slug ?? ""}
-          />
         </div>
       </div>
 
@@ -222,19 +213,22 @@ export default async function TeamCalendarPage({
             <Square className="h-6 w-6 text-text-2" />
           </div>
           <h2 className="mb-1 text-[15px] font-semibold text-text">
-            No events scheduled
+            No Events Scheduled
           </h2>
           <p className="mb-5 text-[12.5px] text-text-2">
-            Schedule your first event.
+            Schedule your first event or import from a CSV or ICS file.
           </p>
-          <NewTeamEventButton
-            orgs={orgs.map((o) => ({
-              slug: o.slug,
-              name: o.name,
-              brandColor: o.brandColor,
-            }))}
-            defaultOrgSlug={active?.slug ?? orgs[0]?.slug ?? ""}
-          />
+          <div className="flex items-center gap-3">
+            <ImportTeamCalendarButton />
+            <NewTeamEventButton
+              orgs={orgs.map((o) => ({
+                slug: o.slug,
+                name: o.name,
+                brandColor: o.brandColor,
+              }))}
+              defaultOrgSlug={active?.slug ?? orgs[0]?.slug ?? ""}
+            />
+          </div>
         </div>
       ) : isCalendarView ? (
         <div className="rounded-[var(--rlg)] border border-border bg-card p-10 text-center shadow-[var(--sh-xs)]">

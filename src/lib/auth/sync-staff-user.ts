@@ -1,4 +1,4 @@
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import { users } from "@/lib/db/schema";
@@ -7,11 +7,11 @@ import type { ActiveOrg } from "@/lib/auth/active-org";
 /**
  * Ensure the currently signed-in Clerk staff user has a matching row in
  * the `users` table for the given active org. Creates the row on first
- * visit, updates name/email/avatar thereafter.
+ * visit to THIS org, updates name/email/avatar thereafter.
  *
- * Safe to call on every dashboard request — the lookup is a cheap indexed
- * query on clerk_id, and the insert uses ON-CONFLICT semantics via a
- * pre-check.
+ * Because a Clerk user can be staff in multiple orgs (one seat per org),
+ * we look up by (clerk_id, org_id) — not clerk_id alone — so switching
+ * orgs will create a second row for that Clerk user in the new org.
  */
 export async function syncStaffUser(activeOrg: ActiveOrg): Promise<void> {
   const clerkUser = await currentUser();
@@ -26,11 +26,11 @@ export async function syncStaffUser(activeOrg: ActiveOrg): Promise<void> {
     [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
     primaryEmail.split("@")[0];
 
-  // Is there already a users row for this Clerk id?
+  // Is there already a row for this Clerk id in THIS org?
   const [existing] = await db
     .select()
     .from(users)
-    .where(eq(users.clerkId, clerkUser.id))
+    .where(and(eq(users.clerkId, clerkUser.id), eq(users.orgId, activeOrg.id)))
     .limit(1);
 
   if (!existing) {
@@ -62,7 +62,7 @@ export async function syncStaffUser(activeOrg: ActiveOrg): Promise<void> {
           email: primaryEmail,
           avatarUrl: clerkUser.imageUrl || null,
         })
-        .where(eq(users.clerkId, clerkUser.id));
+        .where(eq(users.id, existing.id));
     }
   }
 }

@@ -18,6 +18,7 @@ import {
 import { db } from "@/lib/db";
 import { calendarEvents, contacts, users } from "@/lib/db/schema";
 import { getActiveOrg } from "@/lib/auth/active-org";
+import { Button, buttonClasses } from "@/components/ui/button";
 import { AddAppointmentForm } from "./add-appointment-form";
 import { deleteAppointment } from "./actions";
 
@@ -209,28 +210,33 @@ export default async function CalendarlyPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-text">
-            {activeOrg ? `${activeOrg.name} Calendarly` : "Calendarly"}
+            Calendarly
           </h1>
           <p className="mt-0.5 text-[13px] text-text-2">
             Both companies — scheduling overview
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            type="button"
-            className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-[color:var(--border-strong,var(--border))] bg-card px-3.5 py-2 text-[13px] font-medium text-text shadow-[var(--sh-xs)] transition-colors hover:bg-muted-bg"
+          <Button
+            variant="secondary"
+            size="md"
+            leftIcon={<Settings className="h-3.5 w-3.5" />}
           >
-            <Settings className="h-3.5 w-3.5" />
             Scheduling
-          </button>
+          </Button>
           <Link
             href="#add-appointment"
-            className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-pb-navy px-3.5 py-2 text-[13px] font-semibold text-white shadow-[var(--sh-xs)] transition-opacity hover:opacity-90"
+            className={buttonClasses({ variant: "primary", size: "md" })}
           >
             <Plus className="h-3.5 w-3.5" />
             New Appointment
           </Link>
         </div>
+      </div>
+
+      {/* Expanded add-appointment form — only renders when #add-appointment is in the URL */}
+      <div id="add-appointment" className="scroll-mt-20">
+        <AddAppointmentForm clients={clientOptions} />
       </div>
 
       {/* KPI strip */}
@@ -328,7 +334,7 @@ export default async function CalendarlyPage() {
             </h2>
             <Link
               href="#add-appointment"
-              className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-pb-navy px-3 py-1.5 text-[12px] font-semibold text-white shadow-[var(--sh-xs)] transition-opacity hover:opacity-90"
+              className={buttonClasses({ variant: "primary", size: "sm" })}
             >
               <Plus className="h-3 w-3" />
               New
@@ -422,13 +428,15 @@ export default async function CalendarlyPage() {
                     </div>
                     <form action={deleteAppointment} className="shrink-0">
                       <input type="hidden" name="id" value={appt.id} />
-                      <button
+                      <Button
                         type="submit"
+                        variant="ghost"
+                        size="icon"
                         aria-label="Cancel"
-                        className="rounded-full p-1.5 text-text-2 transition-colors hover:bg-[rgba(219,25,36,0.08)] hover:text-pb-red"
+                        className="hover:bg-[rgba(219,25,36,0.08)] hover:text-pb-red"
                       >
                         <Trash2 className="h-3.5 w-3.5" />
-                      </button>
+                      </Button>
                     </form>
                   </li>
                 );
@@ -540,10 +548,6 @@ export default async function CalendarlyPage() {
         </div>
       </div>
 
-      {/* Add Appointment form (anchor target) */}
-      <div id="add-appointment" className="scroll-mt-20">
-        <AddAppointmentForm clients={clientOptions} />
-      </div>
     </div>
   );
 }

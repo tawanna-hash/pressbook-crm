@@ -17,6 +17,7 @@ import {
   deleteAvailabilitySlot,
   saveOrgBookingUrl,
 } from "./actions";
+import { Button } from "@/components/ui/button";
 
 const WEEKDAYS = [
   { value: 1, label: "Mon", short: "M" },
@@ -53,14 +54,14 @@ export function AvailabilityModalButton({
 
   return (
     <>
-      <button
-        type="button"
+      <Button
+        variant="secondary"
+        size="md"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-border bg-card px-3.5 py-2 text-[13px] font-medium text-text shadow-[var(--sh-xs)] transition-colors hover:bg-muted-bg"
+        leftIcon={<Clock className="h-3.5 w-3.5" />}
       >
-        <Clock className="h-3.5 w-3.5" />
         Availability &amp; Links
-      </button>
+      </Button>
       {open && (
         <AvailabilityModal
           orgName={orgName}
@@ -113,28 +114,29 @@ function AvailabilityModal({
             </div>
             <div>
               <h2 className="text-[15px] font-semibold text-text">
-                Availability &amp; booking links
+                Availability & Booking Links
               </h2>
               <p className="mt-0.5 text-[12.5px] text-text-2">
                 Set hours and share a link for {orgName}.
               </p>
             </div>
           </div>
-          <button
-            type="button"
+          <Button
+            variant="ghost"
+            size="icon"
             onClick={onClose}
             aria-label="Close"
-            className="shrink-0 rounded-full p-1.5 text-text-2 transition-colors hover:bg-muted-bg hover:text-text"
+            className="shrink-0"
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
 
         <div className="space-y-6 border-t border-border px-6 py-5">
           {/* ─── Public URL ─── */}
           <section>
             <SectionHeading
-              title="Public booking link"
+              title="Public Booking Link"
               caption="Clients land here when they tap any Book A Time button."
             />
             <form
@@ -151,19 +153,16 @@ function AvailabilityModal({
                   className="w-full rounded-[var(--r)] border border-border bg-card py-2 pl-8 pr-3 text-[13px] text-text placeholder:text-text-3 focus:border-pb-navy focus:outline-none focus:ring-2 focus:ring-[rgba(2,29,64,0.15)]"
                 />
               </div>
-              <button
-                type="submit"
-                className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] bg-pb-navy px-4 py-2 text-[12.5px] font-semibold text-white shadow-[var(--sh-xs)] transition-opacity hover:opacity-90"
-              >
-                Save link
-              </button>
+              <Button type="submit" variant="primary" size="md">
+                Save Link
+              </Button>
             </form>
           </section>
 
           {/* ─── Availability slots ─── */}
           <section>
             <SectionHeading
-              title="Weekly availability"
+              title="Weekly Availability"
               caption="Default hours for the team. Override per person inside a card."
             />
 
@@ -201,13 +200,15 @@ function AvailabilityModal({
                               </span>
                               <form action={deleteAvailabilitySlot}>
                                 <input type="hidden" name="id" value={s.id} />
-                                <button
+                                <Button
                                   type="submit"
+                                  variant="ghost"
+                                  size="icon"
                                   aria-label="Delete slot"
-                                  className="rounded-full p-1.5 text-text-2 transition-colors hover:bg-[rgba(219,25,36,0.08)] hover:text-pb-red"
+                                  className="hover:bg-[rgba(219,25,36,0.08)] hover:text-pb-red"
                                 >
                                   <Trash2 className="h-3.5 w-3.5" />
-                                </button>
+                                </Button>
                               </form>
                             </li>
                           ))}
@@ -302,13 +303,15 @@ function AvailabilityModal({
                         className="w-full rounded-[var(--r)] border border-border bg-card px-3 py-2 text-[13px] tabular-nums text-text focus:border-pb-navy focus:outline-none focus:ring-2 focus:ring-[rgba(2,29,64,0.15)]"
                       />
                     </div>
-                    <button
+                    <Button
                       type="submit"
-                      className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] bg-pb-navy px-4 py-2 text-[12.5px] font-semibold text-white shadow-[var(--sh-xs)] transition-opacity hover:opacity-90 sm:self-end"
+                      variant="primary"
+                      size="md"
+                      className="sm:self-end"
+                      leftIcon={<Plus className="h-3.5 w-3.5" />}
                     >
-                      <Plus className="h-3.5 w-3.5" />
-                      Add slot
-                    </button>
+                      Add Slot
+                    </Button>
                   </div>
                 </div>
               </form>
@@ -321,7 +324,7 @@ function AvailabilityModal({
               <Info className="mt-0.5 h-3.5 w-3.5 shrink-0 text-text-2" />
               <div className="text-[12.5px] leading-relaxed text-text-2">
                 <div className="font-semibold text-text">
-                  Individual booking links
+                  Individual Booking Links
                 </div>
                 {publicBookingUrl
                   ? "Each team member's card links to this base URL. Per-user links are coming soon."
@@ -333,13 +336,13 @@ function AvailabilityModal({
 
         {/* ─── Footer ─── */}
         <div className="flex justify-end gap-2 border-t border-border bg-muted-bg/30 px-6 py-3.5">
-          <button
-            type="button"
+          <Button
+            variant="primary"
+            size="md"
             onClick={onClose}
-            className="rounded-[var(--r)] bg-pb-navy px-4 py-2 text-[13px] font-semibold text-white shadow-[var(--sh-xs)] transition-opacity hover:opacity-90"
           >
             Done
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -369,7 +372,7 @@ function EmptyState() {
         <CalendarDays className="h-4 w-4 text-text-2" />
       </div>
       <p className="text-[13px] font-semibold text-text">
-        No availability set
+        No Availability Set
       </p>
       <p className="mt-0.5 text-[12px] text-text-2">
         Add your first slot below.

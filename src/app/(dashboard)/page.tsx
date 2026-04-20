@@ -15,6 +15,7 @@ import {
 import { db } from "@/lib/db";
 import { contacts } from "@/lib/db/schema";
 import { getActiveOrg } from "@/lib/auth/active-org";
+import { Button, buttonClasses } from "@/components/ui/button";
 
 export const dynamic = "force-dynamic";
 
@@ -185,7 +186,7 @@ export default async function DashboardPage() {
         <div className="rounded-xl border border-border bg-card shadow-sm lg:col-span-2">
           <div className="flex items-center justify-between border-b border-border px-6 py-4">
             <h2 className="text-base font-semibold text-foreground">
-              Recently added clients
+              Recently Added Clients
             </h2>
             <Link
               href="/clients"
@@ -209,7 +210,7 @@ export default async function DashboardPage() {
               </p>
               <Link
                 href="/clients"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-pb-navy px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition-colors hover:opacity-90"
+                className={buttonClasses({ variant: "primary", size: "sm" })}
               >
                 <Plus className="h-3.5 w-3.5" />
                 Add your first client
@@ -291,7 +292,7 @@ export default async function DashboardPage() {
           <div className="flex items-center gap-2 border-b border-border px-6 py-4">
             <ShieldCheck className="h-4 w-4 text-pb-green" />
             <h2 className="text-base font-semibold text-foreground">
-              Recent portal activations
+              Recent Portal Activations
             </h2>
           </div>
 

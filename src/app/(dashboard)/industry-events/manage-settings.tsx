@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Plus, Settings2, Trash2, X } from "lucide-react";
+import { Button, buttonClasses } from "@/components/ui/button";
 import {
   addCategory,
   addLocation,
@@ -42,14 +43,15 @@ export function ManageSettingsButton({
 
   return (
     <>
-      <button
+      <Button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-border bg-card px-3.5 py-2 text-[13px] font-medium text-text shadow-[var(--sh-xs)] transition-colors hover:bg-muted-bg"
+        variant="secondary"
+        size="md"
+        leftIcon={<Settings2 className="h-3.5 w-3.5" />}
       >
-        <Settings2 className="h-3.5 w-3.5" />
         Manage
-      </button>
+      </Button>
       {open && (
         <ManageSettingsModal
           categories={categories}
@@ -85,14 +87,15 @@ function ManageSettingsModal({
               Manage Event Settings
             </h2>
           </div>
-          <button
+          <Button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-full p-1.5 text-text-2 hover:bg-muted-bg hover:text-text"
+            variant="ghost"
+            size="icon"
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
 
         {/* Tabs */}
@@ -127,13 +130,14 @@ function ManageSettingsModal({
         </div>
 
         <div className="flex justify-end border-t border-border px-6 py-4">
-          <button
+          <Button
             type="button"
             onClick={onClose}
-            className="rounded-[var(--r)] border border-border bg-card px-4 py-2 text-[13px] font-medium text-text transition-colors hover:bg-muted-bg"
+            variant="secondary"
+            size="md"
           >
             Done
-          </button>
+          </Button>
         </div>
       </div>
     </div>
@@ -162,13 +166,14 @@ function CategoriesTab({ categories }: { categories: Category[] }) {
                 <span className="text-text">{p.name}</span>
                 <form action={deleteCategory}>
                   <input type="hidden" name="id" value={p.id} />
-                  <button
+                  <Button
                     type="submit"
                     aria-label="Delete"
-                    className="rounded-full p-1 text-text-2 hover:bg-[rgba(219,25,36,0.08)] hover:text-pb-red"
+                    variant="ghost"
+                    size="icon"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  </Button>
                 </form>
               </li>
             ))}
@@ -183,13 +188,14 @@ function CategoriesTab({ categories }: { categories: Category[] }) {
             className="flex-1 rounded-[var(--r)] border border-border bg-card px-3 py-2 text-[13px] text-text focus:border-pb-navy focus:outline-none focus:ring-2 focus:ring-[rgba(2,29,64,0.15)]"
           />
           <input type="hidden" name="isParent" value="on" />
-          <button
+          <Button
             type="submit"
-            className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-pb-navy px-3.5 py-2 text-[12.5px] font-semibold text-white hover:opacity-90"
+            variant="primary"
+            size="sm"
+            leftIcon={<Plus className="h-3.5 w-3.5" />}
           >
-            <Plus className="h-3.5 w-3.5" />
             Add
-          </button>
+          </Button>
         </form>
       </section>
 
@@ -222,13 +228,14 @@ function CategoriesTab({ categories }: { categories: Category[] }) {
                     <td className="py-2 text-right">
                       <form action={deleteCategory}>
                         <input type="hidden" name="id" value={c.id} />
-                        <button
+                        <Button
                           type="submit"
                           aria-label="Delete"
-                          className="rounded-full p-1 text-text-2 hover:bg-[rgba(219,25,36,0.08)] hover:text-pb-red"
+                          variant="ghost"
+                          size="icon"
                         >
                           <Trash2 className="h-3.5 w-3.5" />
-                        </button>
+                        </Button>
                       </form>
                     </td>
                   </tr>
@@ -260,13 +267,14 @@ function CategoriesTab({ categories }: { categories: Category[] }) {
               </option>
             ))}
           </select>
-          <button
+          <Button
             type="submit"
-            className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] bg-pb-navy px-3.5 py-2 text-[12.5px] font-semibold text-white hover:opacity-90"
+            variant="primary"
+            size="sm"
+            leftIcon={<Plus className="h-3.5 w-3.5" />}
           >
-            <Plus className="h-3.5 w-3.5" />
             Add
-          </button>
+          </Button>
         </form>
       </section>
     </div>
@@ -293,13 +301,14 @@ function OrganizersTab({ organizers }: { organizers: Organizer[] }) {
               <span className="text-text">{o.name}</span>
               <form action={deleteOrganizer}>
                 <input type="hidden" name="id" value={o.id} />
-                <button
+                <Button
                   type="submit"
                   aria-label="Delete"
-                  className="rounded-full p-1 text-text-2 hover:bg-[rgba(219,25,36,0.08)] hover:text-pb-red"
+                  variant="ghost"
+                  size="icon"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
-                </button>
+                </Button>
               </form>
             </li>
           ))}
@@ -313,13 +322,14 @@ function OrganizersTab({ organizers }: { organizers: Organizer[] }) {
           placeholder="New organizer name…"
           className="flex-1 rounded-[var(--r)] border border-border bg-card px-3 py-2 text-[13px] text-text focus:border-pb-navy focus:outline-none focus:ring-2 focus:ring-[rgba(2,29,64,0.15)]"
         />
-        <button
+        <Button
           type="submit"
-          className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-pb-navy px-3.5 py-2 text-[12.5px] font-semibold text-white hover:opacity-90"
+          variant="primary"
+          size="sm"
+          leftIcon={<Plus className="h-3.5 w-3.5" />}
         >
-          <Plus className="h-3.5 w-3.5" />
           Add
-        </button>
+        </Button>
       </form>
     </div>
   );
@@ -358,13 +368,14 @@ function LocationsTab({ locations }: { locations: Location[] }) {
                 <td className="py-2 text-right">
                   <form action={deleteLocation}>
                     <input type="hidden" name="id" value={l.id} />
-                    <button
+                    <Button
                       type="submit"
                       aria-label="Delete"
-                      className="rounded-full p-1 text-text-2 hover:bg-[rgba(219,25,36,0.08)] hover:text-pb-red"
+                      variant="ghost"
+                      size="icon"
                     >
                       <Trash2 className="h-3.5 w-3.5" />
-                    </button>
+                    </Button>
                   </form>
                 </td>
               </tr>
@@ -407,13 +418,14 @@ function LocationsTab({ locations }: { locations: Location[] }) {
           placeholder="ZIP"
           className="rounded-[var(--r)] border border-border bg-card px-3 py-2 text-[13px] text-text focus:border-pb-navy focus:outline-none focus:ring-2 focus:ring-[rgba(2,29,64,0.15)]"
         />
-        <button
+        <Button
           type="submit"
-          className="inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] bg-pb-navy px-3.5 py-2 text-[12.5px] font-semibold text-white hover:opacity-90"
+          variant="primary"
+          size="sm"
+          leftIcon={<Plus className="h-3.5 w-3.5" />}
         >
-          <Plus className="h-3.5 w-3.5" />
           Add
-        </button>
+        </Button>
       </form>
     </div>
   );

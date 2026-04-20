@@ -1,7 +1,7 @@
-import { asc, eq } from "drizzle-orm";
+import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
 import Link from "next/link";
+import { currentUser } from "@clerk/nextjs/server";
 import {
-  BookOpen,
   Calendar,
   Check,
   Clock,
@@ -12,10 +12,12 @@ import { db } from "@/lib/db";
 import {
   availabilitySlots,
   bookingOrgSettings,
+  calendarEvents,
   users,
 } from "@/lib/db/schema";
 import { getActiveOrg } from "@/lib/auth/active-org";
 import { AvailabilityModalButton } from "./availability-modal";
+import { BookTimeButton } from "./book-time-button";
 
 export const dynamic = "force-dynamic";
 
@@ -101,21 +103,61 @@ export default async function BookingPage({
     ? uniqueMembers.filter((m) => m.id === member)
     : uniqueMembers;
 
+  // ── Existing bookings for conflict-detection ──
+  // Pull any calendar_events in the next 14 days whose agent_email matches
+  // one of our members — those start times get hidden from the BookTime
+  // modal's slot list so nobody books a slot that's already taken.
+  const now = new Date();
+  const in14 = new Date(now);
+  in14.setDate(in14.getDate() + 14);
+  const memberEmails = uniqueMembers.map((m) => m.email);
+  const bookedRows = memberEmails.length
+    ? await db
+        .select({
+          agentEmail: calendarEvents.agentEmail,
+          date: calendarEvents.date,
+        })
+        .from(calendarEvents)
+        .where(
+          and(
+            eq(calendarEvents.orgId, activeOrg.id),
+            inArray(calendarEvents.agentEmail, memberEmails),
+            gte(calendarEvents.date, now),
+            lt(calendarEvents.date, in14),
+          ),
+        )
+    : [];
+
+  const bookedByEmail = new Map<string, string[]>();
+  for (const r of bookedRows) {
+    if (!r.agentEmail) continue;
+    const arr = bookedByEmail.get(r.agentEmail) ?? [];
+    arr.push(r.date.toISOString());
+    bookedByEmail.set(r.agentEmail, arr);
+  }
+
+  // Prefill name + email on the booking modal when the viewer is a staff
+  // member (useful when staff book each other).
+  const clerkUser = await currentUser();
+  const viewerDefaults = clerkUser
+    ? {
+        name:
+          [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") ||
+          null,
+        email:
+          clerkUser.emailAddresses.find(
+            (e) => e.id === clerkUser.primaryEmailAddressId,
+          )?.emailAddress ?? null,
+      }
+    : { name: null, email: null };
+
   return (
     <div className="space-y-5">
       {/* Header */}
       <div>
-        <h1 className="flex items-center gap-2 text-xl font-bold text-text">
-          <span
-            className="h-2.5 w-2.5 rounded-full"
-            style={{ backgroundColor: activeOrg.brandColor }}
-          />
-          {activeOrg.name}
-          <BookOpen className="h-4 w-4 text-text-2" />
-          Booking
-        </h1>
+        <h1 className="text-xl font-bold text-text">Booking</h1>
         <p className="mt-0.5 text-[13px] text-text-2">
-          {activeOrg.name} — schedule time with the team
+          Schedule time with the team
         </p>
       </div>
 
@@ -163,7 +205,7 @@ export default async function BookingPage({
             <UserIcon className="h-6 w-6 text-text-2" />
           </div>
           <h2 className="mb-1 text-[15px] font-semibold text-text">
-            No team members yet
+            No Team Members Yet
           </h2>
           <p className="text-[12.5px] text-text-2">
             Add a team member in Settings to enable bookings.
@@ -178,7 +220,7 @@ export default async function BookingPage({
             const hasAvailability = memberSlots.length > 0;
             const duration = m.meetingDurationMinutes ?? 30;
             const location = m.meetingLocation ?? "Austin, TX";
-            const bookingUrl = m.publicBookingUrl ?? publicBookingUrl;
+            const alreadyBooked = bookedByEmail.get(m.email) ?? [];
             return (
               <div
                 key={m.id}
@@ -229,26 +271,32 @@ export default async function BookingPage({
                   </li>
                 </ul>
 
-                {bookingUrl ? (
+                <BookTimeButton
+                  memberId={m.id}
+                  memberName={m.name}
+                  memberEmail={m.email}
+                  durationMinutes={duration}
+                  location={location}
+                  availability={memberSlots.map((s) => ({
+                    dayOfWeek: s.dayOfWeek,
+                    startTime: s.startTime,
+                    endTime: s.endTime,
+                  }))}
+                  bookedStartAtIsos={alreadyBooked}
+                  viewerName={viewerDefaults.name}
+                  viewerEmail={viewerDefaults.email}
+                />
+                {/* Legacy Calendly-style URL support — still shown as an extra
+                    link for anyone who prefers the external host. */}
+                {(m.publicBookingUrl ?? publicBookingUrl) && (
                   <a
-                    href={bookingUrl}
+                    href={m.publicBookingUrl ?? publicBookingUrl ?? "#"}
                     target="_blank"
                     rel="noreferrer"
-                    className="mt-auto inline-flex items-center justify-center gap-1.5 rounded-[var(--r)] bg-pb-navy px-3 py-2.5 text-[13px] font-semibold text-white shadow-[var(--sh-xs)] transition-opacity hover:opacity-90"
+                    className="mt-2 inline-flex items-center justify-center gap-1 text-[11.5px] font-medium text-pb-navy hover:underline"
                   >
-                    <Calendar className="h-3.5 w-3.5" />
-                    Book A Time
+                    Or open external link
                   </a>
-                ) : (
-                  <button
-                    type="button"
-                    disabled
-                    className="mt-auto inline-flex cursor-not-allowed items-center justify-center gap-1.5 rounded-[var(--r)] bg-pb-navy/40 px-3 py-2.5 text-[13px] font-semibold text-white"
-                    title="Set a public booking URL first"
-                  >
-                    <Calendar className="h-3.5 w-3.5" />
-                    Book A Time
-                  </button>
                 )}
               </div>
             );

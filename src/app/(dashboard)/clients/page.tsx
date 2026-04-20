@@ -64,22 +64,14 @@ export default async function ClientsPage({
 
   return (
     <div className="space-y-6">
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
-          <div className="flex items-center gap-2">
-            {activeOrg && (
-              <span
-                className="h-2.5 w-2.5 rounded-full"
-                style={{ backgroundColor: activeOrg.brandColor }}
-              />
-            )}
-            <h1 className="text-2xl font-bold text-foreground">
-              {activeOrg ? `${activeOrg.name} Clients` : "Clients"}
-            </h1>
-          </div>
-          <p className="mt-1 text-sm text-muted">
+          <h1 className="text-xl font-bold text-text">
+            Clients
+          </h1>
+          <p className="mt-0.5 text-[13px] text-text-2">
             {activeOrg
-              ? `Clients belonging to ${activeOrg.name}. Switch companies in the sidebar to see the other list.`
+              ? "Switch companies in the sidebar to see the other list."
               : "Switch to a company in the sidebar to see its clients."}
           </p>
         </div>
@@ -90,7 +82,7 @@ export default async function ClientsPage({
       <div className="rounded-xl border border-border bg-card shadow-sm">
         <div className="flex items-center justify-between border-b border-border px-6 py-4">
           <h2 className="text-base font-semibold text-foreground">
-            All clients
+            All Clients
           </h2>
           <div className="flex items-center gap-3">
             <span className="text-xs text-muted">

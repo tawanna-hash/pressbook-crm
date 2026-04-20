@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Plus } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { EventForm, type EventFormOptions } from "./event-form";
 
 type Props = {
@@ -16,37 +17,40 @@ export function NewEventButton({ options, variant = "primary", label = "New Even
   const button = (() => {
     if (variant === "big") {
       return (
-        <button
+        <Button
           type="button"
           onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-2 rounded-[var(--r)] bg-pb-navy px-6 py-3 text-[14px] font-semibold text-white shadow-[var(--sh-sm)] transition-opacity hover:opacity-90"
+          variant="primary"
+          size="lg"
+          leftIcon={<Plus className="h-4 w-4" />}
         >
-          <Plus className="h-4 w-4" />
           {label}
-        </button>
+        </Button>
       );
     }
     if (variant === "ghost") {
       return (
-        <button
+        <Button
           type="button"
           onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-1.5 rounded-[var(--r)] border border-border bg-card px-3.5 py-2 text-[13px] font-medium text-text shadow-[var(--sh-xs)] transition-colors hover:bg-muted-bg"
+          variant="secondary"
+          size="md"
+          leftIcon={<Plus className="h-3.5 w-3.5" />}
         >
-          <Plus className="h-3.5 w-3.5" />
           {label}
-        </button>
+        </Button>
       );
     }
     return (
-      <button
+      <Button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-pb-navy px-3.5 py-2 text-[13px] font-semibold text-white shadow-[var(--sh-xs)] transition-opacity hover:opacity-90"
+        variant="primary"
+        size="md"
+        leftIcon={<Plus className="h-3.5 w-3.5" />}
       >
-        <Plus className="h-3.5 w-3.5" />
         {label}
-      </button>
+      </Button>
     );
   })();
 

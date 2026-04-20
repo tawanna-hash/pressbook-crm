@@ -5,7 +5,7 @@ import { usePathname } from "next/navigation";
 import { UserButton } from "@clerk/nextjs";
 import {
   Users, FileText, Megaphone, MailCheck, Calendar,
-  Settings, LayoutDashboard, Check, CalendarClock, CalendarDays,
+  LayoutDashboard, Check, CalendarClock, CalendarDays,
   BookOpen, Clock,
 } from "lucide-react";
 import { useTransition } from "react";
@@ -49,7 +49,6 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/campaigns",  label: "Campaign Hub",   icon: Megaphone },
   { href: "/verify",     label: "Verify Emails",  icon: MailCheck },
   { href: "/calendar",   label: "Calendar",       icon: Calendar },
-  { href: "/settings",   label: "Settings",       icon: Settings },
 ];
 
 type Org = {

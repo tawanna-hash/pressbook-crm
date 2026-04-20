@@ -6,7 +6,6 @@ import {
   LayoutGrid,
   List,
   MapPin,
-  Upload,
   Calendar as CalendarIcon,
   ExternalLink,
 } from "lucide-react";
@@ -20,6 +19,7 @@ import {
 import { getActiveOrg } from "@/lib/auth/active-org";
 import { NewEventButton } from "./new-event-button";
 import { ManageSettingsButton } from "./manage-settings";
+import { ImportIndustryEventsButton } from "./import-button";
 
 export const dynamic = "force-dynamic";
 
@@ -118,7 +118,7 @@ export default async function IndustryEventsPage({
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-text">
-            {activeOrg.name} Industry Events
+            Industry Events
           </h1>
           <p className="mt-0.5 text-[13px] text-text-2">
             {events.length} {events.length === 1 ? "event" : "events"} scheduled
@@ -171,15 +171,6 @@ export default async function IndustryEventsPage({
             <Download className="h-3.5 w-3.5" />
             Export
           </button>
-          <button
-            type="button"
-            disabled
-            className="inline-flex cursor-not-allowed items-center gap-1.5 rounded-[var(--r)] border border-border bg-card px-3.5 py-2 text-[13px] font-medium text-text-3 shadow-[var(--sh-xs)]"
-            title="Coming soon"
-          >
-            <Upload className="h-3.5 w-3.5" />
-            Import
-          </button>
           <ManageSettingsButton
             categories={categoryRows.map((c) => ({
               id: c.id,
@@ -197,7 +188,6 @@ export default async function IndustryEventsPage({
               zip: l.zip,
             }))}
           />
-          <NewEventButton options={formOptions} />
         </div>
       </div>
 
@@ -217,15 +207,7 @@ export default async function IndustryEventsPage({
             Create your first event or import from a CSV or ICS file.
           </p>
           <div className="flex items-center gap-3">
-            <button
-              type="button"
-              disabled
-              className="flex items-center gap-2 rounded-[var(--r)] border border-border bg-card px-6 py-3 text-[13px] font-medium text-text-3"
-              title="Import coming soon"
-            >
-              <Upload className="h-4 w-4" />
-              Import
-            </button>
+            <ImportIndustryEventsButton />
             <NewEventButton options={formOptions} variant="big" />
           </div>
         </div>

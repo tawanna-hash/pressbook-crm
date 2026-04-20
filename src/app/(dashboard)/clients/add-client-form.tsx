@@ -4,6 +4,7 @@ import { useActionState, useEffect, useRef, useState } from "react";
 import { AlertCircle, CheckCircle2, UserPlus, X } from "lucide-react";
 import { createClient, type ClientFormState } from "./actions";
 import { ClientFormFields } from "./client-form-fields";
+import { Button, buttonClasses } from "@/components/ui/button";
 
 const INITIAL: ClientFormState = { ok: false, message: "" };
 
@@ -28,14 +29,15 @@ export function AddClientForm() {
   if (!open) {
     return (
       <div className="flex items-center justify-end">
-        <button
+        <Button
           type="button"
           onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-pb-navy px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-pb-navy/90"
+          variant="primary"
+          size="md"
+          leftIcon={<UserPlus className="h-4 w-4" />}
         >
-          <UserPlus className="h-4 w-4" />
-          Add client
-        </button>
+          Add Client
+        </Button>
       </div>
     );
   }
@@ -90,20 +92,22 @@ export function AddClientForm() {
             <span />
           )}
           <div className="flex items-center gap-2">
-            <button
+            <Button
               type="button"
               onClick={() => setOpen(false)}
-              className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-gray-50"
+              variant="secondary"
+              size="md"
             >
               Cancel
-            </button>
-            <button
+            </Button>
+            <Button
               type="submit"
               disabled={pending}
-              className="inline-flex items-center gap-2 rounded-lg bg-pb-navy px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-pb-navy/90 disabled:cursor-not-allowed disabled:opacity-60"
+              variant="primary"
+              size="md"
             >
-              {pending ? "Saving…" : "Save client"}
-            </button>
+              {pending ? "Saving…" : "Save Client"}
+            </Button>
           </div>
         </div>
       </form>

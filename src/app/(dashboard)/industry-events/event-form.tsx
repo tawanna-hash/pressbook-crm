@@ -7,6 +7,7 @@ import {
   CheckCircle2,
   X,
 } from "lucide-react";
+import { Button, buttonClasses } from "@/components/ui/button";
 import {
   saveIndustryEvent,
   type EventFormState,
@@ -121,14 +122,15 @@ export function EventForm({
             <CalendarPlus className="h-4 w-4 text-pb-navy" />
             <h2 className="text-base font-semibold text-text">{modeLabel}</h2>
           </div>
-          <button
+          <Button
             type="button"
             onClick={onClose}
             aria-label="Close"
-            className="rounded-full p-1.5 text-text-2 hover:bg-muted-bg hover:text-text"
+            variant="ghost"
+            size="icon"
           >
             <X className="h-4 w-4" />
-          </button>
+          </Button>
         </div>
 
         {/* Body */}
@@ -582,20 +584,22 @@ export function EventForm({
               <span />
             )}
             <div className="flex items-center gap-2">
-              <button
+              <Button
                 type="button"
                 onClick={onClose}
-                className="rounded-[var(--r)] border border-border bg-card px-4 py-2 text-[13px] font-medium text-text transition-colors hover:bg-muted-bg"
+                variant="secondary"
+                size="md"
               >
                 Cancel
-              </button>
-              <button
+              </Button>
+              <Button
                 type="submit"
                 disabled={pending}
-                className="inline-flex items-center gap-2 rounded-[var(--r)] bg-pb-navy px-5 py-2 text-[13px] font-semibold text-white shadow-[var(--sh-xs)] transition-opacity hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                variant="primary"
+                size="md"
               >
                 {pending ? "Saving…" : initial.id ? "Save Changes" : "Create Event"}
-              </button>
+              </Button>
             </div>
           </div>
         </form>

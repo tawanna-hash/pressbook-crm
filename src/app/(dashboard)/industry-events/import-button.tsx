@@ -2,9 +2,9 @@
 
 import { useState } from "react";
 import { CalendarDays, FileSpreadsheet, FileText, Upload, X } from "lucide-react";
-import { Button, buttonClasses } from "@/components/ui/button";
+import { Button } from "@/components/ui/button";
 
-export function ImportTeamCalendarButton() {
+export function ImportIndustryEventsButton() {
   const [open, setOpen] = useState(false);
   return (
     <>
@@ -24,7 +24,7 @@ export function ImportTeamCalendarButton() {
               <div className="flex items-center gap-2.5">
                 <Upload className="h-4 w-4 text-pb-navy" />
                 <h2 className="text-base font-semibold text-text">
-                  Import Team Calendar
+                  Import Industry Events
                 </h2>
               </div>
               <Button
@@ -40,7 +40,7 @@ export function ImportTeamCalendarButton() {
 
             <div className="space-y-5 px-6 py-5">
               <p className="text-[13px] text-text-2">
-                Upload a file to import appointments. Supported formats:
+                Upload a file to import industry events. Supported formats:
               </p>
 
               <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -70,7 +70,7 @@ export function ImportTeamCalendarButton() {
                 </div>
                 <div className="space-x-2">
                   <code className="rounded bg-card px-1.5 py-0.5 text-[11px] text-text">
-                    title, subject, summary
+                    title, name, event
                   </code>
                   <code className="rounded bg-card px-1.5 py-0.5 text-[11px] text-text">
                     date, start, start date, dtstart
@@ -79,16 +79,16 @@ export function ImportTeamCalendarButton() {
                     end, end date, dtend
                   </code>
                   <code className="rounded bg-card px-1.5 py-0.5 text-[11px] text-text">
-                    client, attendee, contact
+                    organizer, host
                   </code>
                   <code className="rounded bg-card px-1.5 py-0.5 text-[11px] text-text">
-                    location
+                    location, venue
+                  </code>
+                  <code className="rounded bg-card px-1.5 py-0.5 text-[11px] text-text">
+                    category
                   </code>
                   <code className="rounded bg-card px-1.5 py-0.5 text-[11px] text-text">
                     notes, description
-                  </code>
-                  <code className="rounded bg-card px-1.5 py-0.5 text-[11px] text-text">
-                    email, agent email
                   </code>
                 </div>
               </div>

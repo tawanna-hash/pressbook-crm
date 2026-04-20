@@ -13,6 +13,7 @@ import {
   ClientFormFields,
   type ClientInitialValues,
 } from "../client-form-fields";
+import { Button, buttonClasses } from "@/components/ui/button";
 
 const INITIAL: ClientFormState = { ok: false, message: "" };
 
@@ -53,17 +54,18 @@ export function EditClientForm({ client }: Props) {
           <div className="flex items-center gap-2">
             <Link
               href="/clients"
-              className="rounded-lg border border-gray-300 px-4 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-gray-50"
+              className={buttonClasses({ variant: "secondary", size: "md" })}
             >
               Cancel
             </Link>
-            <button
+            <Button
               type="submit"
               disabled={pending}
-              className="inline-flex items-center gap-2 rounded-lg bg-pb-navy px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:bg-pb-navy/90 disabled:cursor-not-allowed disabled:opacity-60"
+              variant="primary"
+              size="md"
             >
-              {pending ? "Saving…" : "Save changes"}
-            </button>
+              {pending ? "Saving…" : "Save Changes"}
+            </Button>
           </div>
         </div>
       </form>
@@ -88,13 +90,14 @@ export function EditClientForm({ client }: Props) {
           }}
         >
           <input type="hidden" name="id" value={client.id} />
-          <button
+          <Button
             type="submit"
-            className="inline-flex items-center gap-2 rounded-lg border border-red-300 bg-white px-4 py-2.5 text-sm font-semibold text-pb-red transition-colors hover:bg-red-100"
+            variant="danger"
+            size="md"
+            leftIcon={<Trash2 className="h-4 w-4" />}
           >
-            <Trash2 className="h-4 w-4" />
-            Delete client
-          </button>
+            Delete Client
+          </Button>
         </form>
       </div>
     </div>

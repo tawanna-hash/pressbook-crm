@@ -1,6 +1,6 @@
 import {
   pgTable, text, varchar, timestamp, boolean, integer, jsonb,
-  uuid, pgEnum, serial
+  uuid, pgEnum, serial, unique
 } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 
@@ -18,6 +18,8 @@ export const taskStatusEnum = pgEnum("task_status", ["to_do", "in_progress", "do
 export const taskPriorityEnum = pgEnum("task_priority", ["low", "medium", "high"]);
 export const emailStatusEnum = pgEnum("email_status", ["valid", "invalid", "risk", "unknown"]);
 export const outreachChannelEnum = pgEnum("outreach_channel", ["email", "sms", "drip"]);
+export const meetingPollStatusEnum = pgEnum("meeting_poll_status", ["draft", "open", "booked", "closed"]);
+export const meetingPollLocationEnum = pgEnum("meeting_poll_location", ["zoom", "phone", "in_person", "all_options"]);
 
 // ═══════════════════════════════════════════════════════════════
 // TABLES
@@ -38,21 +40,29 @@ export const organizations = pgTable("organizations", {
 });
 
 // ── Users ─────────────────────────────────────────────────────
-export const users = pgTable("users", {
-  id: uuid("id").primaryKey().defaultRandom(),
-  clerkId: varchar("clerk_id", { length: 255 }).notNull().unique(),
-  orgId: uuid("org_id").notNull().references(() => organizations.id),
-  role: userRoleEnum("role").notNull().default("member"),
-  name: varchar("name", { length: 255 }).notNull(),
-  email: varchar("email", { length: 255 }).notNull(),
-  avatarUrl: text("avatar_url"),
-  // Booking settings (per user)
-  publicBookingUrl: varchar("public_booking_url", { length: 500 }),
-  meetingDurationMinutes: integer("meeting_duration_minutes").default(30),
-  meetingLocation: varchar("meeting_location", { length: 255 }),
-  bookingBio: text("booking_bio"),
-  createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+// A signed-in Clerk user can belong to multiple orgs (one staff "seat"
+// per org), so clerk_id is NOT globally unique — only unique per org.
+export const users = pgTable(
+  "users",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    clerkId: varchar("clerk_id", { length: 255 }).notNull(),
+    orgId: uuid("org_id").notNull().references(() => organizations.id),
+    role: userRoleEnum("role").notNull().default("member"),
+    name: varchar("name", { length: 255 }).notNull(),
+    email: varchar("email", { length: 255 }).notNull(),
+    avatarUrl: text("avatar_url"),
+    // Booking settings (per user)
+    publicBookingUrl: varchar("public_booking_url", { length: 500 }),
+    meetingDurationMinutes: integer("meeting_duration_minutes").default(30),
+    meetingLocation: varchar("meeting_location", { length: 255 }),
+    bookingBio: text("booking_bio"),
+    createdAt: timestamp("created_at").notNull().defaultNow(),
+  },
+  (t) => ({
+    clerkOrgUnique: unique("users_clerk_id_org_id_unique").on(t.clerkId, t.orgId),
+  }),
+);
 
 // ── Booking org settings ──────────────────────────────────────
 export const bookingOrgSettings = pgTable("booking_org_settings", {
@@ -71,6 +81,42 @@ export const availabilitySlots = pgTable("availability_slots", {
   dayOfWeek: integer("day_of_week").notNull(), // 0=Sun … 6=Sat
   startTime: varchar("start_time", { length: 5 }).notNull(),
   endTime: varchar("end_time", { length: 5 }).notNull(),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ── Meeting polls (Scheduling) ────────────────────────────────
+// Host-created polls where invitees vote on which times work.
+export const meetingPolls = pgTable("meeting_polls", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id),
+  hostUserId: uuid("host_user_id").notNull().references(() => users.id),
+  shareToken: varchar("share_token", { length: 32 }).notNull().unique(),
+  name: varchar("name", { length: 255 }).notNull().default("Meeting"),
+  durationMinutes: integer("duration_minutes").notNull().default(30),
+  location: meetingPollLocationEnum("location").notNull().default("zoom"),
+  description: text("description"),
+  reserveTimes: boolean("reserve_times").notNull().default(false),
+  showVotes: boolean("show_votes").notNull().default(true),
+  language: varchar("language", { length: 16 }).notNull().default("en"),
+  status: meetingPollStatusEnum("status").notNull().default("draft"),
+  selectedTimeId: uuid("selected_time_id"), // nullable FK, set when booked
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const meetingPollTimes = pgTable("meeting_poll_times", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  pollId: uuid("poll_id").notNull().references(() => meetingPolls.id, { onDelete: "cascade" }),
+  startAt: timestamp("start_at", { withTimezone: true }).notNull(),
+  endAt: timestamp("end_at", { withTimezone: true }).notNull(),
+});
+
+export const meetingPollVotes = pgTable("meeting_poll_votes", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  pollId: uuid("poll_id").notNull().references(() => meetingPolls.id, { onDelete: "cascade" }),
+  timeId: uuid("time_id").notNull().references(() => meetingPollTimes.id, { onDelete: "cascade" }),
+  voterName: varchar("voter_name", { length: 255 }).notNull(),
+  voterEmail: varchar("voter_email", { length: 255 }).notNull(),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

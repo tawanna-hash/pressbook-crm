@@ -52,7 +52,7 @@ export default async function EditClientPage({
 
       <div>
         <div className="flex items-center gap-3">
-          <h1 className="text-2xl font-bold text-foreground">{fullName}</h1>
+          <h1 className="text-2xl font-bold text-text">{fullName}</h1>
           {activated ? (
             <span className="inline-flex items-center gap-1.5 rounded-full bg-green-50 px-2.5 py-0.5 text-xs font-medium text-pb-green">
               <CheckCircle2 className="h-3.5 w-3.5" />
@@ -65,7 +65,7 @@ export default async function EditClientPage({
             </span>
           )}
         </div>
-        <p className="mt-1 text-sm text-muted">
+        <p className="mt-0.5 text-[13px] text-text-2">
           Edit this client&rsquo;s info below.
         </p>
       </div>

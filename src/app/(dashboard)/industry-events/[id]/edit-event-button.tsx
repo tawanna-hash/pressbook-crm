@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { Pencil } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import {
   EventForm,
   type EventFormOptions,
@@ -19,14 +20,15 @@ export function EditEventButton({
 
   return (
     <>
-      <button
+      <Button
         type="button"
         onClick={() => setOpen(true)}
-        className="inline-flex items-center gap-1.5 rounded-[var(--r)] bg-pb-navy px-3.5 py-2 text-[13px] font-semibold text-white shadow-[var(--sh-xs)] transition-opacity hover:opacity-90"
+        variant="primary"
+        size="md"
+        leftIcon={<Pencil className="h-3.5 w-3.5" />}
       >
-        <Pencil className="h-3.5 w-3.5" />
         Edit
-      </button>
+      </Button>
       {open && (
         <EventForm
           options={options}

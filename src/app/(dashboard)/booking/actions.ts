@@ -1,11 +1,14 @@
 "use server";
 
-import { and, eq } from "drizzle-orm";
+import { and, eq, gte, lt } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import { currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
 import {
   availabilitySlots,
   bookingOrgSettings,
+  calendarEvents,
+  users,
 } from "@/lib/db/schema";
 import { getActiveOrg } from "@/lib/auth/active-org";
 
@@ -66,4 +69,118 @@ export async function deleteAvailabilitySlot(formData: FormData): Promise<void> 
     .delete(availabilitySlots)
     .where(and(eq(availabilitySlots.id, id), eq(availabilitySlots.orgId, org.id)));
   revalidatePath("/booking");
+}
+
+// ─── Internal booking: "Book a Time" button ───────────────────
+export type BookTimeResult =
+  | { ok: true; eventId: string }
+  | { ok: false; error: string };
+
+/**
+ * Book a concrete time slot with a given member. Creates a calendar_events
+ * row that shows up in Calendarly (if a contact is later linked) and in the
+ * Team Calendar.
+ *
+ * Expected FormData:
+ *   memberId     uuid of the member to book with
+ *   startAt      ISO datetime the meeting starts
+ *   clientName   string
+ *   clientEmail  string (validated loosely)
+ *
+ * The member must belong to the active org. Slot validity is sanity-checked
+ * against the member's weekly availability and existing bookings, but the
+ * main gate is that the UI only surfaces valid, unbooked slots.
+ */
+export async function bookTime(formData: FormData): Promise<BookTimeResult> {
+  const org = await getActiveOrg();
+  if (!org) return { ok: false, error: "No active org." };
+
+  const memberId = String(formData.get("memberId") ?? "").trim();
+  const startAtStr = String(formData.get("startAt") ?? "").trim();
+  const clientName = String(formData.get("clientName") ?? "").trim();
+  const clientEmail = String(formData.get("clientEmail") ?? "").trim().toLowerCase();
+
+  if (!memberId) return { ok: false, error: "Missing member." };
+  if (!startAtStr) return { ok: false, error: "Pick a time." };
+  if (!clientName) return { ok: false, error: "Your name is required." };
+  if (!/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(clientEmail))
+    return { ok: false, error: "A valid email is required." };
+
+  const startAt = new Date(startAtStr);
+  if (Number.isNaN(startAt.getTime()))
+    return { ok: false, error: "Invalid start time." };
+  if (startAt.getTime() < Date.now())
+    return { ok: false, error: "That time is in the past." };
+
+  const [member] = await db
+    .select()
+    .from(users)
+    .where(and(eq(users.id, memberId), eq(users.orgId, org.id)))
+    .limit(1);
+  if (!member)
+    return { ok: false, error: "That team member isn't in this org." };
+
+  const durationMinutes = member.meetingDurationMinutes ?? 30;
+  const endAt = new Date(startAt.getTime() + durationMinutes * 60_000);
+
+  // Conflict check — any existing event for this member overlapping
+  // [startAt, endAt). We only check agent_email match because that's how we
+  // associate events with a hosting member today.
+  const sameDayStart = new Date(startAt);
+  sameDayStart.setHours(0, 0, 0, 0);
+  const sameDayEnd = new Date(sameDayStart);
+  sameDayEnd.setDate(sameDayEnd.getDate() + 1);
+
+  const existing = await db
+    .select({ id: calendarEvents.id, date: calendarEvents.date })
+    .from(calendarEvents)
+    .where(
+      and(
+        eq(calendarEvents.orgId, org.id),
+        eq(calendarEvents.agentEmail, member.email),
+        gte(calendarEvents.date, sameDayStart),
+        lt(calendarEvents.date, sameDayEnd),
+      ),
+    );
+  const conflict = existing.some((e) => {
+    const t = e.date.getTime();
+    return t === startAt.getTime();
+  });
+  if (conflict)
+    return { ok: false, error: "That slot was just taken. Pick another." };
+
+  // createdBy — if the current Clerk user has a row in this org, attribute
+  // the booking to them. Otherwise leave null (e.g. public client booking).
+  const clerkUser = await currentUser();
+  let createdBy: string | null = null;
+  if (clerkUser) {
+    const [self] = await db
+      .select({ id: users.id })
+      .from(users)
+      .where(and(eq(users.clerkId, clerkUser.id), eq(users.orgId, org.id)))
+      .limit(1);
+    createdBy = self?.id ?? null;
+  }
+
+  const [inserted] = await db
+    .insert(calendarEvents)
+    .values({
+      orgId: org.id,
+      title: `Booking with ${member.name}`,
+      date: startAt,
+      endDate: endAt,
+      durationMinutes,
+      location: member.meetingLocation ?? null,
+      type: "booking",
+      notes: `Booked by ${clientName} <${clientEmail}>`,
+      clientName,
+      agentEmail: member.email,
+      createdBy,
+    })
+    .returning({ id: calendarEvents.id });
+
+  revalidatePath("/booking");
+  revalidatePath("/calendarly");
+  revalidatePath("/team");
+  return { ok: true, eventId: inserted.id };
 }

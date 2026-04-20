@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { createAppointment, type AppointmentFormState } from "./actions";
 import { APPOINTMENT_TYPES } from "./options";
+import { Button } from "@/components/ui/button";
 
 const INITIAL: AppointmentFormState = { ok: false, message: "" };
 
@@ -43,30 +44,43 @@ export function AddAppointmentForm({ clients }: { clients: ClientOption[] }) {
   );
   const formRef = useRef<HTMLFormElement>(null);
 
+  // Open the form when the URL hash is #add-appointment — lets a header-level
+  // "+ New Appointment" link trigger it without prop-drilling state.
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const syncFromHash = () => {
+      if (window.location.hash === "#add-appointment") setOpen(true);
+    };
+    syncFromHash();
+    window.addEventListener("hashchange", syncFromHash);
+    return () => window.removeEventListener("hashchange", syncFromHash);
+  }, []);
+
   useEffect(() => {
     if (state.ok) {
       formRef.current?.reset();
-      const t = setTimeout(() => setOpen(false), 1000);
+      const t = setTimeout(() => {
+        setOpen(false);
+        // clear the hash so clicking the link again re-opens the form
+        if (typeof window !== "undefined" && window.location.hash === "#add-appointment") {
+          history.replaceState(null, "", window.location.pathname + window.location.search);
+        }
+      }, 1000);
       return () => clearTimeout(t);
     }
   }, [state]);
 
   const errors = state.fieldErrors ?? {};
 
-  if (!open) {
-    return (
-      <div className="flex items-center justify-end">
-        <button
-          type="button"
-          onClick={() => setOpen(true)}
-          className="inline-flex items-center gap-2 rounded-lg bg-pb-navy px-4 py-2.5 text-sm font-semibold text-white shadow-sm transition-colors hover:opacity-90"
-        >
-          <CalendarPlus className="h-4 w-4" />
-          New appointment
-        </button>
-      </div>
-    );
-  }
+  // Collapsed state now renders nothing — the trigger lives in the page header.
+  if (!open) return null;
+
+  const handleClose = () => {
+    setOpen(false);
+    if (typeof window !== "undefined" && window.location.hash === "#add-appointment") {
+      history.replaceState(null, "", window.location.pathname + window.location.search);
+    }
+  };
 
   return (
     <div className="rounded-xl border border-border bg-card shadow-sm">
@@ -87,14 +101,14 @@ export function AddAppointmentForm({ clients }: { clients: ClientOption[] }) {
             </p>
           </div>
         </div>
-        <button
-          type="button"
-          onClick={() => setOpen(false)}
+        <Button
+          variant="ghost"
+          size="icon"
+          onClick={handleClose}
           aria-label="Close"
-          className="rounded-full p-2 text-muted hover:bg-gray-100 hover:text-foreground"
         >
           <X className="h-4 w-4" />
-        </button>
+        </Button>
       </div>
 
       <form ref={formRef} action={formAction} className="space-y-4 px-6 py-5">
