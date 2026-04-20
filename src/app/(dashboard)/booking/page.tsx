@@ -30,6 +30,32 @@ function initialsOf(name: string): string {
     .toUpperCase();
 }
 
+/**
+ * Collapse rows that refer to the same person by normalized name.
+ * When the same name appears more than once in an org (e.g. a real
+ * Clerk-synced row + a demo seed row), prefer the non-demo row so the
+ * real user wins. Keeps first-seen otherwise.
+ */
+function dedupeByName<T extends { name: string; clerkId: string | null }>(
+  rows: T[],
+): T[] {
+  const byKey = new Map<string, T>();
+  for (const row of rows) {
+    const key = row.name.trim().toLowerCase();
+    const existing = byKey.get(key);
+    if (!existing) {
+      byKey.set(key, row);
+      continue;
+    }
+    const existingIsDemo = existing.clerkId?.startsWith("demo_") ?? false;
+    const incomingIsDemo = row.clerkId?.startsWith("demo_") ?? false;
+    if (existingIsDemo && !incomingIsDemo) {
+      byKey.set(key, row);
+    }
+  }
+  return Array.from(byKey.values());
+}
+
 export default async function BookingPage({
   searchParams,
 }: {
@@ -67,9 +93,13 @@ export default async function BookingPage({
 
   const publicBookingUrl = orgSettings[0]?.publicBookingUrl ?? null;
 
+  // Collapse duplicate rows (e.g. demo seed + real Clerk-synced user with
+  // the same name) so each person shows exactly once in pills and cards.
+  const uniqueMembers = dedupeByName(teamMembers);
+
   const filteredMembers = member
-    ? teamMembers.filter((m) => m.id === member)
-    : teamMembers;
+    ? uniqueMembers.filter((m) => m.id === member)
+    : uniqueMembers;
 
   return (
     <div className="space-y-5">
@@ -99,7 +129,7 @@ export default async function BookingPage({
             showCheck
           />
           <span className="text-text-3">|</span>
-          {teamMembers.map((m) => (
+          {uniqueMembers.map((m) => (
             <FilterPill
               key={m.id}
               href={`/booking?member=${m.id}`}
@@ -119,7 +149,7 @@ export default async function BookingPage({
             startTime: s.startTime,
             endTime: s.endTime,
           }))}
-          members={teamMembers.map((m) => ({ id: m.id, name: m.name }))}
+          members={uniqueMembers.map((m) => ({ id: m.id, name: m.name }))}
         />
       </div>
 
