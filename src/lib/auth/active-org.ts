@@ -11,6 +11,15 @@ export type ActiveOrg = {
   slug: string;
   name: string;
   brandColor: string;
+  logoUrl: string | null;
+  phone: string | null;
+  websiteUrl: string | null;
+  address: string | null;
+  address2: string | null;
+  city: string | null;
+  state: string | null;
+  zip: string | null;
+  about: string | null;
 };
 
 /**
@@ -32,12 +41,7 @@ export async function getActiveOrg(): Promise<ActiveOrg | null> {
       .where(eq(organizations.slug, slugFromCookie))
       .limit(1);
     if (match) {
-      return {
-        id: match.id,
-        slug: match.slug,
-        name: match.name,
-        brandColor: match.brandColor,
-      };
+      return toActiveOrg(match);
     }
   }
 
@@ -48,11 +52,24 @@ export async function getActiveOrg(): Promise<ActiveOrg | null> {
     .limit(1);
 
   if (!first) return null;
+  return toActiveOrg(first);
+}
+
+function toActiveOrg(o: typeof organizations.$inferSelect): ActiveOrg {
   return {
-    id: first.id,
-    slug: first.slug,
-    name: first.name,
-    brandColor: first.brandColor,
+    id: o.id,
+    slug: o.slug,
+    name: o.name,
+    brandColor: o.brandColor,
+    logoUrl: o.logoUrl,
+    phone: o.phone,
+    websiteUrl: o.websiteUrl,
+    address: o.address,
+    address2: o.address2,
+    city: o.city,
+    state: o.state,
+    zip: o.zip,
+    about: o.about,
   };
 }
 
@@ -64,12 +81,7 @@ export async function listOrgs(): Promise<ActiveOrg[]> {
     .select()
     .from(organizations)
     .orderBy(asc(organizations.slug));
-  return rows.map((r) => ({
-    id: r.id,
-    slug: r.slug,
-    name: r.name,
-    brandColor: r.brandColor,
-  }));
+  return rows.map(toActiveOrg);
 }
 
 /**

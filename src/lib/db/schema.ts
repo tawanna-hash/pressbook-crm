@@ -35,8 +35,54 @@ export const organizations = pgTable("organizations", {
   mailDomain: varchar("mail_domain", { length: 255 }),
   plan: orgPlanEnum("plan").notNull().default("free"),
   stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+  // ── Agency profile (for Client Portal display) ──
+  logoUrl: text("logo_url"),               // base64 data URL or external URL
+  address: text("address"),
+  address2: varchar("address_2", { length: 255 }),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 50 }),
+  zip: varchar("zip", { length: 20 }),
+  phone: varchar("phone", { length: 50 }),
+  websiteUrl: varchar("website_url", { length: 500 }),
+  about: text("about"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// ── Organization locations (additional offices) ───────────────
+// Primary address still lives on the `organizations` row; this table
+// stores every extra office the agency lists in its client portal.
+export const organizationLocations = pgTable("organization_locations", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id),
+  label: varchar("label", { length: 100 }).notNull().default("Office"),
+  address: text("address"),
+  address2: varchar("address_2", { length: 255 }),
+  city: varchar("city", { length: 100 }),
+  state: varchar("state", { length: 50 }),
+  zip: varchar("zip", { length: 20 }),
+  phone: varchar("phone", { length: 50 }),
+  sortOrder: integer("sort_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// ── Portal files (shared between staff + clients) ─────────────
+// orgId scopes every file. contactId is optional:
+//   • set    → file is private between a staff member and this one client
+//   • null   → general agency file, visible to all clients of the org
+// uploadedByUserId XOR uploadedByContactId identifies the uploader.
+export const portalFiles = pgTable("portal_files", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id),
+  contactId: uuid("contact_id"),
+  name: varchar("name", { length: 255 }).notNull(),
+  url: text("url").notNull(),              // base64 data URL or external URL
+  mimeType: varchar("mime_type", { length: 100 }),
+  sizeBytes: integer("size_bytes"),
+  uploadedByUserId: uuid("uploaded_by_user_id"),
+  uploadedByContactId: uuid("uploaded_by_contact_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
 // ── Users ─────────────────────────────────────────────────────
@@ -52,6 +98,14 @@ export const users = pgTable(
     name: varchar("name", { length: 255 }).notNull(),
     email: varchar("email", { length: 255 }).notNull(),
     avatarUrl: text("avatar_url"),
+    // Staff profile — office + address + mobile
+    locationId: uuid("location_id"),
+    address: text("address"),
+    address2: varchar("address_2", { length: 255 }),
+    city: varchar("city", { length: 100 }),
+    state: varchar("state", { length: 50 }),
+    zip: varchar("zip", { length: 20 }),
+    mobile: varchar("mobile", { length: 50 }),
     // Booking settings (per user)
     publicBookingUrl: varchar("public_booking_url", { length: 500 }),
     meetingDurationMinutes: integer("meeting_duration_minutes").default(30),
