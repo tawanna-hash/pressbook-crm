@@ -14,7 +14,7 @@ const STATUS_OPTIONS: { value: StatusFilter; label: string }[] = [
   { value: "inactive",  label: "Inactive" },
 ];
 
-export function ClientsFilters() {
+export function ClientsFilters({ hideStatus = false }: { hideStatus?: boolean } = {}) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
@@ -79,29 +79,31 @@ export function ClientsFilters() {
       </div>
 
       <div className="flex items-center gap-2">
-        <div className="inline-flex items-center rounded-lg bg-white p-0.5 shadow-sm ring-1 ring-gray-200">
-          {STATUS_OPTIONS.map((opt) => (
-            <button
-              key={opt.value}
-              type="button"
-              onClick={() => setStatus(opt.value)}
-              className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
-                status === opt.value
-                  ? "bg-pb-navy text-white"
-                  : "text-foreground hover:bg-gray-100"
-              }`}
-            >
-              {opt.label}
-            </button>
-          ))}
-        </div>
+        {!hideStatus && (
+          <div className="inline-flex items-center rounded-lg bg-white p-0.5 shadow-sm ring-1 ring-gray-200">
+            {STATUS_OPTIONS.map((opt) => (
+              <button
+                key={opt.value}
+                type="button"
+                onClick={() => setStatus(opt.value)}
+                className={`rounded-md px-3 py-1.5 text-xs font-medium transition-colors ${
+                  status === opt.value
+                    ? "bg-pb-navy text-white"
+                    : "text-foreground hover:bg-gray-100"
+                }`}
+              >
+                {opt.label}
+              </button>
+            ))}
+          </div>
+        )}
 
         {hasFilters && (
           <button
             type="button"
             onClick={() => {
               setQ("");
-              setStatus("all");
+              if (!hideStatus) setStatus("all");
             }}
             className="text-xs font-medium text-pb-navy transition-opacity hover:opacity-70"
           >

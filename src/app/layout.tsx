@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
+import Script from "next/script";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 
@@ -17,8 +18,6 @@ export const metadata: Metadata = {
 
 // Inline script — runs BEFORE React hydration to prevent a flash of the
 // wrong theme. Reads from localStorage, falls back to system preference.
-// Placed as a plain <script> in <head> per Next.js 16's guidance; using
-// next/script with beforeInteractive inside <body> throws a console warning.
 const NO_FLASH_SCRIPT = `(function(){try{var s=localStorage.getItem('pb-theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=(s==='dark'||s==='light')?s:(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`;
 
 export default function RootLayout({
@@ -29,13 +28,12 @@ export default function RootLayout({
   return (
     <ClerkProvider>
       <html lang="en" className={inter.variable} suppressHydrationWarning>
-        <head>
-          <script
-            id="pb-theme-init"
-            dangerouslySetInnerHTML={{ __html: NO_FLASH_SCRIPT }}
-          />
-        </head>
-        <body className="antialiased font-sans">{children}</body>
+        <body className="antialiased font-sans">
+          <Script id="pb-theme-init" strategy="beforeInteractive">
+            {NO_FLASH_SCRIPT}
+          </Script>
+          {children}
+        </body>
       </html>
     </ClerkProvider>
   );

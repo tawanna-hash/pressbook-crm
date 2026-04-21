@@ -7,6 +7,8 @@ export type ClientStatus = (typeof STATUS_OPTIONS)[number];
 
 export const INDUSTRY_OPTIONS = [
   "Real Estate",
+  "Homebuilder",
+  "Developer",
   "Mortgage",
   "Insurance",
   "Title",

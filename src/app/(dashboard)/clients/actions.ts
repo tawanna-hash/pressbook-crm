@@ -10,6 +10,10 @@ import {
 } from "@/lib/db/schema";
 import { getActiveOrg } from "@/lib/auth/active-org";
 import { STATUS_OPTIONS, type ClientStatus } from "./client-options";
+import {
+  additionalContactToClientLike,
+  upsertAdvertiserMailing,
+} from "../mailing/sync-helpers";
 
 // ─────────────────────────────────────────────────────────────────────
 // Form types & validation helpers
@@ -59,9 +63,20 @@ function readAdditionalContacts(formData: FormData): AdditionalContact[] {
     const email     = String(formData.get(`addl[${i}].email`)     ?? "").trim();
     const title     = String(formData.get(`addl[${i}].title`)     ?? "").trim();
     const phone     = String(formData.get(`addl[${i}].phone`)     ?? "").trim();
+    const address   = String(formData.get(`addl[${i}].address`)   ?? "").trim();
+    const address2  = String(formData.get(`addl[${i}].address2`)  ?? "").trim();
+    const city      = String(formData.get(`addl[${i}].city`)      ?? "").trim();
+    const state     = String(formData.get(`addl[${i}].state`)     ?? "").trim();
+    const zip       = String(formData.get(`addl[${i}].zip`)       ?? "").trim();
     // Only include the contact row if at least one field is filled.
-    if (firstName || lastName || email || title || phone) {
-      out.push({ firstName, lastName, email, title, phone });
+    if (
+      firstName || lastName || email || title || phone ||
+      address || address2 || city || state || zip
+    ) {
+      out.push({
+        firstName, lastName, email, title, phone,
+        address, address2, city, state, zip,
+      });
     }
   }
   return out;
@@ -195,11 +210,65 @@ export async function createClient(
     return { ok: false, message: `Couldn't save client: ${message}` };
   }
 
+  // Auto-sync active clients onto the Advertisers mailing list. Each
+  // sync is independent so a failure on one contact doesn't swallow the
+  // rest. Errors are logged server-side and reported in the success
+  // message so they aren't invisible.
+  let syncedCount = 0;
+  const syncErrors: string[] = [];
+  if (values.status === "active") {
+    try {
+      await upsertAdvertiserMailing(org.id, {
+        firstName:     values.firstName,
+        lastName:      values.lastName,
+        email:         values.email,
+        phone:         values.phone,
+        company:       values.company,
+        title:         values.title,
+        licenseNumber: values.licenseNumber,
+        address:       values.address,
+        address2:      values.address2,
+        city:          values.city,
+        state:         values.state,
+        zip:           values.zip,
+        website:       values.website,
+      });
+      syncedCount += 1;
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error("[createClient] primary Advertisers sync failed:", msg);
+      syncErrors.push(`primary: ${msg}`);
+    }
+
+    for (const ac of values.additionalContacts) {
+      const mapped = additionalContactToClientLike(ac, { company: values.company });
+      if (!mapped) continue;
+      try {
+        await upsertAdvertiserMailing(org.id, mapped);
+        syncedCount += 1;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        const who = [ac.firstName, ac.lastName].filter(Boolean).join(" ") || ac.email || "additional";
+        console.error(`[createClient] ${who} Advertisers sync failed:`, msg);
+        syncErrors.push(`${who}: ${msg}`);
+      }
+    }
+
+    revalidatePath("/mailing/advertisers");
+    revalidatePath("/mailing");
+  }
+
   revalidatePath("/clients");
-  return {
-    ok: true,
-    message: `Added ${values.firstName} ${values.lastName}`.trim() + ".",
-  };
+
+  const base = `Added ${values.firstName} ${values.lastName}`.trim() + ".";
+  const tail =
+    values.status === "active"
+      ? syncErrors.length > 0
+        ? ` Synced ${syncedCount} to Advertisers · ${syncErrors.length} failed — check server logs.`
+        : ` Synced ${syncedCount} to Advertisers.`
+      : "";
+
+  return { ok: true, message: base + tail };
 }
 
 // ─────────────────────────────────────────────────────────────────────
@@ -254,9 +323,66 @@ export async function updateClient(
     return { ok: false, message: `Couldn't save changes: ${message}` };
   }
 
+  // Auto-sync active clients onto the Advertisers mailing list. Each
+  // contact syncs independently so one failure doesn't take out the rest.
+  let syncedCount = 0;
+  const syncErrors: string[] = [];
+  if (values.status === "active") {
+    const org = await getActiveOrg();
+    if (org) {
+      try {
+        await upsertAdvertiserMailing(org.id, {
+          firstName:     values.firstName,
+          lastName:      values.lastName,
+          email:         values.email,
+          phone:         values.phone,
+          company:       values.company,
+          title:         values.title,
+          licenseNumber: values.licenseNumber,
+          address:       values.address,
+          address2:      values.address2,
+          city:          values.city,
+          state:         values.state,
+          zip:           values.zip,
+          website:       values.website,
+        });
+        syncedCount += 1;
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : String(err);
+        console.error("[updateClient] primary Advertisers sync failed:", msg);
+        syncErrors.push(`primary: ${msg}`);
+      }
+
+      for (const ac of values.additionalContacts) {
+        const mapped = additionalContactToClientLike(ac, { company: values.company });
+        if (!mapped) continue;
+        try {
+          await upsertAdvertiserMailing(org.id, mapped);
+          syncedCount += 1;
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : String(err);
+          const who = [ac.firstName, ac.lastName].filter(Boolean).join(" ") || ac.email || "additional";
+          console.error(`[updateClient] ${who} Advertisers sync failed:`, msg);
+          syncErrors.push(`${who}: ${msg}`);
+        }
+      }
+
+      revalidatePath("/mailing/advertisers");
+      revalidatePath("/mailing");
+    }
+  }
+
   revalidatePath("/clients");
   revalidatePath(`/clients/${id}`);
-  return { ok: true, message: "Changes saved." };
+
+  const tail =
+    values.status === "active"
+      ? syncErrors.length > 0
+        ? ` Synced ${syncedCount} to Advertisers · ${syncErrors.length} failed — check server logs.`
+        : ` Synced ${syncedCount} to Advertisers.`
+      : "";
+
+  return { ok: true, message: "Changes saved." + tail };
 }
 
 // ─────────────────────────────────────────────────────────────────────

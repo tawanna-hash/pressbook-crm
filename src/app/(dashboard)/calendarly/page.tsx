@@ -210,7 +210,7 @@ export default async function CalendarlyPage() {
       <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
         <div>
           <h1 className="text-xl font-bold text-text">
-            Calendarly
+            PressBook Us
           </h1>
           <p className="mt-0.5 text-[13px] text-text-2">
             Both companies — scheduling overview

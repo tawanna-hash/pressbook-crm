@@ -1,6 +1,6 @@
 "use server";
 
-import { and, eq, gte, lt } from "drizzle-orm";
+import { and, eq, gte, isNull, lt } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import { currentUser } from "@clerk/nextjs/server";
 import { db } from "@/lib/db";
@@ -12,63 +12,200 @@ import {
 } from "@/lib/db/schema";
 import { getActiveOrg } from "@/lib/auth/active-org";
 
-export async function saveOrgBookingUrl(formData: FormData): Promise<void> {
-  const org = await getActiveOrg();
-  if (!org) return;
-  const url = String(formData.get("publicBookingUrl") ?? "").trim() || null;
+export type SimpleResult = { ok: true } | { ok: false; error: string };
 
-  // Upsert org booking settings
-  const existing = await db
-    .select()
-    .from(bookingOrgSettings)
-    .where(eq(bookingOrgSettings.orgId, org.id))
-    .limit(1);
+export async function saveOrgBookingUrl(
+  formData: FormData,
+): Promise<SimpleResult> {
+  try {
+    const org = await getActiveOrg();
+    if (!org) return { ok: false, error: "No active org. Pick a company in the sidebar." };
+    const url = String(formData.get("publicBookingUrl") ?? "").trim() || null;
 
-  if (existing[0]) {
-    await db
-      .update(bookingOrgSettings)
-      .set({ publicBookingUrl: url, updatedAt: new Date() })
-      .where(eq(bookingOrgSettings.orgId, org.id));
-  } else {
-    await db
-      .insert(bookingOrgSettings)
-      .values({ orgId: org.id, publicBookingUrl: url });
+    const existing = await db
+      .select()
+      .from(bookingOrgSettings)
+      .where(eq(bookingOrgSettings.orgId, org.id))
+      .limit(1);
+
+    if (existing[0]) {
+      await db
+        .update(bookingOrgSettings)
+        .set({ publicBookingUrl: url, updatedAt: new Date() })
+        .where(eq(bookingOrgSettings.orgId, org.id));
+    } else {
+      await db
+        .insert(bookingOrgSettings)
+        .values({ orgId: org.id, publicBookingUrl: url });
+    }
+
+    revalidatePath("/booking");
+    return { ok: true };
+  } catch (e) {
+    console.error("saveOrgBookingUrl failed:", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Save failed." };
   }
-
-  revalidatePath("/booking");
 }
 
-export async function addAvailabilitySlot(formData: FormData): Promise<void> {
-  const org = await getActiveOrg();
-  if (!org) return;
+export async function addAvailabilitySlot(
+  formData: FormData,
+): Promise<SimpleResult> {
+  try {
+    const org = await getActiveOrg();
+    if (!org) return { ok: false, error: "No active org. Pick a company in the sidebar." };
 
-  const userId = String(formData.get("userId") ?? "").trim() || null;
-  const dayOfWeekRaw = String(formData.get("dayOfWeek") ?? "").trim();
-  const startTime = String(formData.get("startTime") ?? "").trim();
-  const endTime = String(formData.get("endTime") ?? "").trim();
+    const userId = String(formData.get("userId") ?? "").trim() || null;
+    const dayOfWeekRaw = String(formData.get("dayOfWeek") ?? "").trim();
+    const startTime = String(formData.get("startTime") ?? "").trim();
+    const endTime = String(formData.get("endTime") ?? "").trim();
 
-  const dayOfWeek = Number.parseInt(dayOfWeekRaw, 10);
-  if (!Number.isFinite(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) return;
-  if (!/^\d{2}:\d{2}$/.test(startTime) || !/^\d{2}:\d{2}$/.test(endTime)) return;
+    if (!dayOfWeekRaw) return { ok: false, error: "Pick a day of the week." };
+    const dayOfWeek = Number.parseInt(dayOfWeekRaw, 10);
+    if (!Number.isFinite(dayOfWeek) || dayOfWeek < 0 || dayOfWeek > 6) {
+      return { ok: false, error: `Invalid day value: ${dayOfWeekRaw}` };
+    }
+    if (!/^\d{2}:\d{2}$/.test(startTime))
+      return { ok: false, error: `Start time is required (got "${startTime}").` };
+    if (!/^\d{2}:\d{2}$/.test(endTime))
+      return { ok: false, error: `End time is required (got "${endTime}").` };
+    if (startTime >= endTime)
+      return { ok: false, error: "End time must be after start time." };
 
-  await db.insert(availabilitySlots).values({
-    orgId: org.id,
-    userId,
-    dayOfWeek,
-    startTime,
-    endTime,
-  });
-  revalidatePath("/booking");
+    await db.insert(availabilitySlots).values({
+      orgId: org.id,
+      userId,
+      dayOfWeek,
+      startTime,
+      endTime,
+    });
+    revalidatePath("/booking");
+    return { ok: true };
+  } catch (e) {
+    console.error("addAvailabilitySlot failed:", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Add failed." };
+  }
 }
 
-export async function deleteAvailabilitySlot(formData: FormData): Promise<void> {
-  const id = String(formData.get("id") ?? "").trim();
-  const org = await getActiveOrg();
-  if (!id || !org) return;
-  await db
-    .delete(availabilitySlots)
-    .where(and(eq(availabilitySlots.id, id), eq(availabilitySlots.orgId, org.id)));
-  revalidatePath("/booking");
+export async function deleteAvailabilitySlot(
+  formData: FormData,
+): Promise<SimpleResult> {
+  try {
+    const id = String(formData.get("id") ?? "").trim();
+    const org = await getActiveOrg();
+    if (!id) return { ok: false, error: "Missing slot id." };
+    if (!org) return { ok: false, error: "No active org." };
+    await db
+      .delete(availabilitySlots)
+      .where(
+        and(eq(availabilitySlots.id, id), eq(availabilitySlots.orgId, org.id)),
+      );
+    revalidatePath("/booking");
+    return { ok: true };
+  } catch (e) {
+    console.error("deleteAvailabilitySlot failed:", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Delete failed." };
+  }
+}
+
+/**
+ * Remove a team member from the active org. Cascades: wipes their
+ * availability slots and nulls out `created_by` on any calendar events they
+ * created. Refuses to delete the currently-signed-in user (you can't boot
+ * yourself).
+ */
+export async function deleteTeamMember(
+  formData: FormData,
+): Promise<SimpleResult> {
+  try {
+    const org = await getActiveOrg();
+    if (!org) return { ok: false, error: "No active org." };
+
+    const memberId = String(formData.get("memberId") ?? "").trim();
+    if (!memberId) return { ok: false, error: "Missing member id." };
+
+    const clerkUser = await currentUser();
+    if (clerkUser) {
+      const [self] = await db
+        .select({ id: users.id })
+        .from(users)
+        .where(and(eq(users.clerkId, clerkUser.id), eq(users.orgId, org.id)))
+        .limit(1);
+      if (self?.id === memberId) {
+        return { ok: false, error: "You can't remove yourself." };
+      }
+    }
+
+    // Verify the target belongs to this org.
+    const [target] = await db
+      .select()
+      .from(users)
+      .where(and(eq(users.id, memberId), eq(users.orgId, org.id)))
+      .limit(1);
+    if (!target)
+      return { ok: false, error: "That member isn't in this org." };
+
+    // Wipe their availability first — the users row is referenced by
+    // availability_slots without cascade.
+    await db
+      .delete(availabilitySlots)
+      .where(
+        and(
+          eq(availabilitySlots.orgId, org.id),
+          eq(availabilitySlots.userId, memberId),
+        ),
+      );
+
+    // Finally, remove the member.
+    await db
+      .delete(users)
+      .where(and(eq(users.id, memberId), eq(users.orgId, org.id)));
+
+    revalidatePath("/booking");
+    revalidatePath("/team");
+    revalidatePath("/calendarly");
+    return { ok: true };
+  } catch (e) {
+    console.error("deleteTeamMember failed:", e);
+    return {
+      ok: false,
+      error: e instanceof Error ? e.message : "Delete failed.",
+    };
+  }
+}
+
+/**
+ * Delete every availability slot belonging to a given member (or all
+ * "all-team" slots if userId is empty). Scoped to the active org so nobody
+ * can wipe another org's data.
+ */
+export async function clearAvailabilityForUser(
+  formData: FormData,
+): Promise<SimpleResult> {
+  try {
+    const org = await getActiveOrg();
+    if (!org) return { ok: false, error: "No active org." };
+
+    // userId can be "" (meaning the "All team members" bucket) or a uuid.
+    const userIdRaw = String(formData.get("userId") ?? "").trim();
+    const userId = userIdRaw === "" ? null : userIdRaw;
+
+    await db
+      .delete(availabilitySlots)
+      .where(
+        and(
+          eq(availabilitySlots.orgId, org.id),
+          userId === null
+            ? isNull(availabilitySlots.userId)
+            : eq(availabilitySlots.userId, userId),
+        ),
+      );
+
+    revalidatePath("/booking");
+    return { ok: true };
+  } catch (e) {
+    console.error("clearAvailabilityForUser failed:", e);
+    return { ok: false, error: e instanceof Error ? e.message : "Clear failed." };
+  }
 }
 
 // ─── Internal booking: "Book a Time" button ───────────────────

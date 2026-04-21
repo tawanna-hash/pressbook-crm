@@ -11,7 +11,7 @@ import { relations } from "drizzle-orm";
 export const orgPlanEnum = pgEnum("org_plan", ["free", "pro", "enterprise"]);
 export const userRoleEnum = pgEnum("user_role", ["owner", "admin", "member"]);
 export const contactTypeEnum = pgEnum("contact_type", ["client", "prospect", "mailing"]);
-export const agreementStatusEnum = pgEnum("agreement_status", ["draft", "sent", "active", "expired", "cancelled"]);
+export const agreementStatusEnum = pgEnum("agreement_status", ["draft", "sent", "signed", "active", "expired", "cancelled"]);
 export const invoiceStatusEnum = pgEnum("invoice_status", ["draft", "sent", "paid", "overdue", "void"]);
 export const campaignStatusEnum = pgEnum("campaign_status", ["draft", "planning", "active", "completed", "archived"]);
 export const taskStatusEnum = pgEnum("task_status", ["to_do", "in_progress", "done"]);
@@ -121,12 +121,19 @@ export const meetingPollVotes = pgTable("meeting_poll_votes", {
 });
 
 // Shape of an entry in `contacts.additionalContacts`.
+// Address fields are optional on older records — stored empty-string when
+// the form leaves them blank so we don't have to branch on undefined.
 export type AdditionalContact = {
   firstName: string;
   lastName: string;
   email: string;
   title: string;
   phone: string;
+  address?: string;
+  address2?: string;
+  city?: string;
+  state?: string;
+  zip?: string;
 };
 
 // ── Contacts ──────────────────────────────────────────────────
@@ -175,16 +182,66 @@ export const contacts = pgTable("contacts", {
 export const agreements = pgTable("agreements", {
   id: uuid("id").primaryKey().defaultRandom(),
   orgId: uuid("org_id").notNull().references(() => organizations.id),
-  contactId: uuid("contact_id").notNull().references(() => contacts.id),
+  // Contact link is optional now — fresh uploads may arrive without a
+  // pre-existing contact. Advertiser info fields below carry identity.
+  contactId: uuid("contact_id").references(() => contacts.id),
   type: varchar("type", { length: 100 }),
   status: agreementStatusEnum("status").notNull().default("draft"),
   startDate: timestamp("start_date"),
   endDate: timestamp("end_date"),
-  amount: integer("amount"),  // cents
+  amount: integer("amount"),  // cents (kept as convenience mirror of ad_rate)
   stripeInvoiceId: varchar("stripe_invoice_id", { length: 255 }),
   notes: text("notes"),
+  signedDocument: text("signed_document"),            // legacy single-file slot
+  signedAt: timestamp("signed_at"),
+  sentToEmail: varchar("sent_to_email", { length: 255 }),
+
+  // ── Option C: advertising-contract fields ──
+  companyName: varchar("company_name", { length: 255 }),
+  repName: varchar("rep_name", { length: 255 }),
+  advertiserEmail: varchar("advertiser_email", { length: 255 }),
+  advertiserPhone: varchar("advertiser_phone", { length: 50 }),
+  advertiserAddress: text("advertiser_address"),
+  adSize: varchar("ad_size", { length: 100 }),
+  frequency: varchar("frequency", { length: 50 }),
+  adRate: integer("ad_rate"),                          // cents per issue
+  adTiming: jsonb("ad_timing").$type<{ months: string[]; years: number }>(),
+  signDate: timestamp("sign_date"),
+  expDate: timestamp("exp_date"),
+  renewalNoticeDate: timestamp("renewal_notice_date"),
+  billingName: varchar("billing_name", { length: 255 }),
+  billingEmail: varchar("billing_email", { length: 255 }),
+  paymentMode: varchar("payment_mode", { length: 20 }), // card|link|invoice|check
+  stripeCustomerId: varchar("stripe_customer_id", { length: 255 }),
+  stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
+  stripePaymentLinkUrl: text("stripe_payment_link_url"),
+  isUploaded: boolean("is_uploaded").notNull().default(false),
+  auditLog: jsonb("audit_log")
+    .$type<
+      { event: string; timestamp: string; userEmail?: string; details?: string }[]
+    >()
+    .notNull()
+    .default([]),
+  eblastPackages: jsonb("eblast_packages")
+    .$type<string[]>()
+    .notNull()
+    .default([]),
+
   createdAt: timestamp("created_at").notNull().defaultNow(),
   updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+export const agreementAttachments = pgTable("agreement_attachments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  agreementId: uuid("agreement_id")
+    .notNull()
+    .references(() => agreements.id, { onDelete: "cascade" }),
+  filename: varchar("filename", { length: 500 }).notNull(),
+  mimeType: varchar("mime_type", { length: 100 }),
+  sizeBytes: integer("size_bytes"),
+  dataUrl: text("data_url"),             // base64 data URL
+  uploadedAt: timestamp("uploaded_at").notNull().defaultNow(),
+  uploadedBy: uuid("uploaded_by").references(() => users.id),
 });
 
 // ── Invoices ──────────────────────────────────────────────────

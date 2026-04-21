@@ -6,7 +6,8 @@ import { UserButton } from "@clerk/nextjs";
 import {
   Users, FileText, Megaphone, MailCheck, Calendar,
   LayoutDashboard, Check, CalendarClock, CalendarDays,
-  BookOpen, Clock,
+  BookOpen, Clock, Inbox, Briefcase, UserMinus, Home,
+  CheckCircle2, Sparkles, CircleSlash, History, LayoutGrid,
 } from "lucide-react";
 import { useTransition } from "react";
 import { switchOrg } from "@/app/(dashboard)/org-actions";
@@ -23,17 +24,20 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/",           label: "Dashboard",      icon: LayoutDashboard },
   {
     href: "/clients",
-    label: "Clients",
+    label: "Client Hub",
     icon: Users,
     children: [
+      { href: "/clients/all",       label: "All Clients", icon: LayoutGrid },
+      { href: "/clients/active",    label: "Active",      icon: CheckCircle2 },
+      { href: "/clients/prospects", label: "Prospects",   icon: Sparkles },
+      { href: "/clients/inactive",  label: "Inactive",    icon: CircleSlash },
       { href: "/agreements",     label: "Agreements", icon: FileText },
       {
         href: "/calendarly",
-        label: "Calendarly",
+        label: "PressBook Us",
         icon: CalendarClock,
         children: [
-          { href: "/team",             label: "Team",            icon: Users },
-          { href: "/industry-events",  label: "Industry Events", icon: CalendarDays },
+          { href: "/team",             label: "Team Calendar",   icon: Users },
           {
             href: "/booking",
             label: "Booking",
@@ -44,6 +48,26 @@ const NAV_ITEMS: NavItem[] = [
           },
         ],
       },
+    ],
+  },
+  {
+    href: "/mailing",
+    label: "Mailing List Hub",
+    icon: Inbox,
+    children: [
+      { href: "/mailing/advertisers",     label: "Advertisers",     icon: Briefcase },
+      { href: "/mailing/non-advertisers", label: "Non-Advertisers", icon: UserMinus },
+      { href: "/mailing/realtors",        label: "REALTORS",        icon: Home },
+    ],
+  },
+  {
+    href: "/industry-events",
+    label: "Events Calendar (website)",
+    icon: CalendarDays,
+    children: [
+      { href: "/industry-events/list",          label: "All Events", icon: LayoutGrid },
+      { href: "/industry-events/list/upcoming", label: "Upcoming",   icon: Clock },
+      { href: "/industry-events/list/past",     label: "Past",       icon: History },
     ],
   },
   { href: "/campaigns",  label: "Campaign Hub",   icon: Megaphone },

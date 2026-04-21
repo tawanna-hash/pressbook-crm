@@ -430,6 +430,60 @@ function AdditionalContactBlock({
           className={fieldClasses(false)}
         />
       </Field>
+
+      {/* ── Mailing address for this contact ─────────────────── */}
+      <Field label="Mailing Address" htmlFor={`addl-${idx}-address`}>
+        <input
+          id={`addl-${idx}-address`}
+          name={`addl[${idx}].address`}
+          type="text"
+          placeholder="123 Main St"
+          defaultValue={initial?.address ?? ""}
+          className={fieldClasses(false)}
+        />
+      </Field>
+      <Field label="Address Line 2" htmlFor={`addl-${idx}-address2`}>
+        <input
+          id={`addl-${idx}-address2`}
+          name={`addl[${idx}].address2`}
+          type="text"
+          placeholder="Suite, unit, etc."
+          defaultValue={initial?.address2 ?? ""}
+          className={fieldClasses(false)}
+        />
+      </Field>
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+        <Field label="City" htmlFor={`addl-${idx}-city`}>
+          <input
+            id={`addl-${idx}-city`}
+            name={`addl[${idx}].city`}
+            type="text"
+            placeholder="City"
+            defaultValue={initial?.city ?? ""}
+            className={fieldClasses(false)}
+          />
+        </Field>
+        <Field label="State" htmlFor={`addl-${idx}-state`}>
+          <input
+            id={`addl-${idx}-state`}
+            name={`addl[${idx}].state`}
+            type="text"
+            placeholder="TX"
+            defaultValue={initial?.state ?? ""}
+            className={fieldClasses(false)}
+          />
+        </Field>
+        <Field label="ZIP" htmlFor={`addl-${idx}-zip`}>
+          <input
+            id={`addl-${idx}-zip`}
+            name={`addl[${idx}].zip`}
+            type="text"
+            placeholder="00000"
+            defaultValue={initial?.zip ?? ""}
+            className={fieldClasses(false)}
+          />
+        </Field>
+      </div>
     </div>
   );
 }

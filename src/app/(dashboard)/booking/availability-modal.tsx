@@ -1,9 +1,10 @@
 "use client";
 
-import { useState } from "react";
+import { useRef, useState, useTransition } from "react";
 import {
   CalendarDays,
   CalendarRange,
+  Check,
   ChevronDown,
   Clock,
   Info,
@@ -14,6 +15,7 @@ import {
 } from "lucide-react";
 import {
   addAvailabilitySlot,
+  clearAvailabilityForUser,
   deleteAvailabilitySlot,
   saveOrgBookingUrl,
 } from "./actions";
@@ -103,6 +105,78 @@ function AvailabilityModal({
     ),
   );
 
+  // ── Explicit save feedback for both forms ──
+  const [urlPending, startUrl] = useTransition();
+  const [urlSavedAt, setUrlSavedAt] = useState(0);
+  const [urlError, setUrlError] = useState<string | null>(null);
+
+  const [slotPending, startSlot] = useTransition();
+  const [slotSavedAt, setSlotSavedAt] = useState(0);
+  const [slotError, setSlotError] = useState<string | null>(null);
+
+  const addSlotFormRef = useRef<HTMLFormElement>(null);
+
+  function handleSaveUrl(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setUrlError(null);
+    const fd = new FormData(e.currentTarget);
+    startUrl(async () => {
+      const res = await saveOrgBookingUrl(fd);
+      if (res.ok) {
+        setUrlSavedAt(Date.now());
+      } else {
+        setUrlError(res.error);
+      }
+    });
+  }
+
+  function handleAddSlot(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSlotError(null);
+    const form = e.currentTarget;
+    const fd = new FormData(form);
+    startSlot(async () => {
+      const res = await addAvailabilitySlot(fd);
+      if (res.ok) {
+        setSlotSavedAt(Date.now());
+        // Reset only the times — keep member + day for fast repeated adds.
+        const s = form.elements.namedItem("startTime") as HTMLInputElement | null;
+        const en = form.elements.namedItem("endTime") as HTMLInputElement | null;
+        if (s) s.value = "09:00";
+        if (en) en.value = "17:00";
+      } else {
+        setSlotError(res.error);
+      }
+    });
+  }
+
+  function handleDeleteSlot(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault();
+    setSlotError(null);
+    const fd = new FormData(e.currentTarget);
+    void (async () => {
+      const res = await deleteAvailabilitySlot(fd);
+      if (!res.ok) setSlotError(res.error);
+    })();
+  }
+
+  function handleClearForUser(userId: string | null, displayName: string) {
+    const ok = window.confirm(
+      `Clear all availability for ${displayName}? This can't be undone.`,
+    );
+    if (!ok) return;
+    setSlotError(null);
+    const fd = new FormData();
+    fd.set("userId", userId ?? "");
+    void (async () => {
+      const res = await clearAvailabilityForUser(fd);
+      if (!res.ok) setSlotError(res.error);
+    })();
+  }
+
+  const urlJustSaved = urlSavedAt > 0 && Date.now() - urlSavedAt < 2500;
+  const slotJustSaved = slotSavedAt > 0 && Date.now() - slotSavedAt < 2500;
+
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/50 p-4 backdrop-blur-sm sm:p-8">
       <div className="w-full max-w-2xl overflow-hidden rounded-[var(--rlg)] bg-card shadow-[var(--sh-lg)] ring-1 ring-black/5">
@@ -140,12 +214,16 @@ function AvailabilityModal({
               caption="Clients land here when they tap any Book A Time button."
             />
             <form
-              action={saveOrgBookingUrl}
+              onSubmit={handleSaveUrl}
               className="mt-3 flex flex-col gap-2 sm:flex-row"
             >
               <div className="relative flex-1">
                 <LinkIcon className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-text-3" />
                 <input
+                  // Key ensures the default value refreshes after a successful
+                  // save — without this, React keeps the controlled-ish input
+                  // stale even after new props arrive.
+                  key={publicBookingUrl ?? "empty"}
                   type="url"
                   name="publicBookingUrl"
                   defaultValue={publicBookingUrl ?? ""}
@@ -153,10 +231,19 @@ function AvailabilityModal({
                   className="w-full rounded-[var(--r)] border border-border bg-card py-2 pl-8 pr-3 text-[13px] text-text placeholder:text-text-3 focus:border-pb-navy focus:outline-none focus:ring-2 focus:ring-[rgba(2,29,64,0.15)]"
                 />
               </div>
-              <Button type="submit" variant="primary" size="md">
-                Save Link
+              <Button
+                type="submit"
+                variant="primary"
+                size="md"
+                disabled={urlPending}
+                leftIcon={urlJustSaved ? <Check className="h-3.5 w-3.5" /> : undefined}
+              >
+                {urlPending ? "Saving…" : urlJustSaved ? "Saved" : "Save Link"}
               </Button>
             </form>
+            {urlError && (
+              <p className="mt-2 text-[11.5px] text-pb-red">{urlError}</p>
+            )}
           </section>
 
           {/* ─── Availability slots ─── */}
@@ -173,13 +260,24 @@ function AvailabilityModal({
                 <ul className="space-y-3">
                   {[...byMember.entries()].map(([memberId, mslots]) => {
                     const member = members.find((m) => m.id === memberId);
+                    const displayName = member?.name ?? "All team members";
                     return (
                       <li key={memberId ?? "unassigned"}>
                         <div className="mb-1.5 flex items-center gap-2 text-[12px] font-semibold text-text-2">
                           <span className="inline-flex h-4 w-4 items-center justify-center rounded-full bg-pb-navy/10 text-[9px] font-bold text-pb-navy">
-                            {(member?.name ?? "All").slice(0, 1).toUpperCase()}
+                            {displayName.slice(0, 1).toUpperCase()}
                           </span>
-                          {member?.name ?? "All team members"}
+                          <span className="flex-1">{displayName}</span>
+                          <button
+                            type="button"
+                            onClick={() =>
+                              handleClearForUser(memberId, displayName)
+                            }
+                            className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium text-text-2 transition-colors hover:bg-[rgba(219,25,36,0.08)] hover:text-pb-red"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Clear all
+                          </button>
                         </div>
                         <ul className="overflow-hidden rounded-[var(--r)] border border-border bg-muted-bg/30">
                           {mslots.map((s, i) => (
@@ -198,7 +296,7 @@ function AvailabilityModal({
                                   {s.startTime} – {s.endTime}
                                 </span>
                               </span>
-                              <form action={deleteAvailabilitySlot}>
+                              <form onSubmit={handleDeleteSlot}>
                                 <input type="hidden" name="id" value={s.id} />
                                 <Button
                                   type="submit"
@@ -221,7 +319,8 @@ function AvailabilityModal({
 
               {/* Add-slot card */}
               <form
-                action={addAvailabilitySlot}
+                ref={addSlotFormRef}
+                onSubmit={handleAddSlot}
                 className="rounded-[var(--r)] border border-dashed border-border bg-muted-bg/40 p-4"
               >
                 <div className="mb-3 flex items-center gap-2 text-[12px] font-semibold text-text-2">
@@ -308,11 +407,27 @@ function AvailabilityModal({
                       variant="primary"
                       size="md"
                       className="sm:self-end"
-                      leftIcon={<Plus className="h-3.5 w-3.5" />}
+                      disabled={slotPending}
+                      leftIcon={
+                        slotJustSaved ? (
+                          <Check className="h-3.5 w-3.5" />
+                        ) : (
+                          <Plus className="h-3.5 w-3.5" />
+                        )
+                      }
                     >
-                      Add Slot
+                      {slotPending
+                        ? "Adding…"
+                        : slotJustSaved
+                          ? "Added"
+                          : "Add Slot"}
                     </Button>
                   </div>
+                  {slotError && (
+                    <p className="mt-2 text-[11.5px] text-pb-red">
+                      {slotError}
+                    </p>
+                  )}
                 </div>
               </form>
             </div>

@@ -1,9 +1,6 @@
 import { and, asc, eq, gte, inArray, lt } from "drizzle-orm";
-import Link from "next/link";
 import { currentUser } from "@clerk/nextjs/server";
 import {
-  Calendar,
-  Check,
   Clock,
   MapPin,
   User as UserIcon,
@@ -18,6 +15,10 @@ import {
 import { getActiveOrg } from "@/lib/auth/active-org";
 import { AvailabilityModalButton } from "./availability-modal";
 import { BookTimeButton } from "./book-time-button";
+import {
+  ClearMemberAvailabilityButton,
+  DeleteMemberButton,
+} from "./clear-member-availability-button";
 
 export const dynamic = "force-dynamic";
 
@@ -30,6 +31,65 @@ function initialsOf(name: string): string {
     .slice(0, 2)
     .join("")
     .toUpperCase();
+}
+
+function formatTimeShort(d: Date): string {
+  return d
+    .toLocaleTimeString(undefined, {
+      hour: "numeric",
+      minute: "2-digit",
+      hour12: true,
+    })
+    .replace(" ", "")
+    .toLowerCase();
+}
+
+function formatDayShort(d: Date): string {
+  return d.toLocaleDateString(undefined, { weekday: "short", month: "short", day: "numeric" });
+}
+
+/**
+ * Expand weekly availability rows into the next N concrete slot start
+ * times, skipping past slots and already-booked start times. Used to show
+ * "next available" chips as a preview on each card.
+ */
+function computeNextAvailable(
+  availability: { dayOfWeek: number; startTime: string; endTime: string }[],
+  durationMinutes: number,
+  bookedIsos: Set<string>,
+  limit: number,
+): Date[] {
+  if (availability.length === 0) return [];
+  const slots: Date[] = [];
+  const now = new Date();
+  const base = new Date(now);
+  base.setHours(0, 0, 0, 0);
+
+  for (let i = 0; i < 14 && slots.length < limit; i++) {
+    const day = new Date(base);
+    day.setDate(base.getDate() + i);
+    const dow = day.getDay();
+    const rows = availability.filter((a) => a.dayOfWeek === dow);
+    for (const row of rows) {
+      const [sh, sm] = row.startTime.split(":").map(Number);
+      const [eh, em] = row.endTime.split(":").map(Number);
+      const dayStart = new Date(day);
+      dayStart.setHours(sh ?? 0, sm ?? 0, 0, 0);
+      const dayEnd = new Date(day);
+      dayEnd.setHours(eh ?? 0, em ?? 0, 0, 0);
+      for (
+        let cursor = new Date(dayStart);
+        cursor.getTime() + durationMinutes * 60_000 <= dayEnd.getTime() &&
+        slots.length < limit;
+        cursor = new Date(cursor.getTime() + durationMinutes * 60_000)
+      ) {
+        if (cursor.getTime() < now.getTime()) continue;
+        if (bookedIsos.has(cursor.toISOString())) continue;
+        slots.push(new Date(cursor));
+      }
+    }
+  }
+  return slots;
 }
 
 /**
@@ -161,26 +221,8 @@ export default async function BookingPage({
         </p>
       </div>
 
-      {/* Filter + Availability */}
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <FilterPill
-            href="/booking"
-            isActive={!member}
-            label="All Team Members"
-            showCheck
-          />
-          <span className="text-text-3">|</span>
-          {uniqueMembers.map((m) => (
-            <FilterPill
-              key={m.id}
-              href={`/booking?member=${m.id}`}
-              isActive={member === m.id}
-              label={m.name.split(" ")[0]}
-              initials={initialsOf(m.name)}
-            />
-          ))}
-        </div>
+      {/* Availability trigger (filter pills removed) */}
+      <div className="flex flex-wrap items-center justify-end gap-3">
         <AvailabilityModalButton
           orgName={activeOrg.name}
           publicBookingUrl={publicBookingUrl}
@@ -224,53 +266,118 @@ export default async function BookingPage({
             return (
               <div
                 key={m.id}
-                className="flex flex-col rounded-[var(--rlg)] border border-border bg-card p-5 shadow-[var(--sh-xs)]"
+                className="group/card flex flex-col rounded-[var(--rlg)] border border-border bg-card p-5 shadow-[var(--sh-xs)] transition-shadow hover:shadow-[var(--sh-sm)]"
               >
-                <div className="mb-4 flex items-center gap-3">
+                {/* Top: avatar + name + delete */}
+                <div className="mb-3 flex items-start gap-3">
                   {m.avatarUrl ? (
                     // eslint-disable-next-line @next/next/no-img-element
                     <img
                       src={m.avatarUrl}
                       alt=""
-                      className="h-12 w-12 shrink-0 rounded-full object-cover"
+                      className="h-14 w-14 shrink-0 rounded-full object-cover ring-2 ring-border"
                     />
                   ) : (
                     <div
-                      className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full text-[13px] font-semibold text-text-2"
-                      style={{ backgroundColor: "var(--muted-bg-2)" }}
+                      className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full text-[15px] font-bold text-white ring-2 ring-border"
+                      style={{ backgroundColor: "var(--pb-navy)" }}
                     >
                       {initialsOf(m.name)}
                     </div>
                   )}
-                  <div className="min-w-0 flex-1">
-                    <div className="truncate text-[14px] font-semibold text-text">
+                  <div className="min-w-0 flex-1 pt-0.5">
+                    <div className="truncate text-[15px] font-semibold text-text">
                       {m.name}
                     </div>
-                    <div className="truncate text-[12px] text-text-2">
+                    <div className="truncate text-[11.5px] text-text-2">
                       {m.email}
                     </div>
+                    <div className="mt-1 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px] text-text-2">
+                      <span className="inline-flex items-center gap-1">
+                        <Clock className="h-3 w-3" />
+                        {duration} min
+                      </span>
+                      <span className="text-text-3">·</span>
+                      <span className="inline-flex items-center gap-1">
+                        <MapPin className="h-3 w-3" />
+                        {location}
+                      </span>
+                    </div>
+                  </div>
+                  <div className="opacity-0 transition-opacity group-hover/card:opacity-100">
+                    <DeleteMemberButton
+                      memberId={m.id}
+                      memberName={m.name}
+                    />
                   </div>
                 </div>
 
-                <ul className="mb-4 space-y-1.5 text-[12.5px] text-text-2">
-                  <li className="flex items-center gap-2">
-                    <Clock className="h-3.5 w-3.5 shrink-0" />
-                    {duration} min meeting
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <Calendar className="h-3.5 w-3.5 shrink-0" />
-                    <span className={hasAvailability ? "text-text" : "italic"}>
-                      {hasAvailability
-                        ? `${memberSlots.length} availability slot${memberSlots.length === 1 ? "" : "s"}`
-                        : "No availability set"}
-                    </span>
-                  </li>
-                  <li className="flex items-center gap-2">
-                    <MapPin className="h-3.5 w-3.5 shrink-0" />
-                    {location}
-                  </li>
-                </ul>
+                {/* Availability status + next-slot preview */}
+                {(() => {
+                  const bookedSet = new Set(alreadyBooked);
+                  const availRows = memberSlots.map((s) => ({
+                    dayOfWeek: s.dayOfWeek,
+                    startTime: s.startTime,
+                    endTime: s.endTime,
+                  }));
+                  const nextSlots = computeNextAvailable(
+                    availRows.length > 0
+                      ? availRows
+                      : [1, 2, 3, 4, 5].map((d) => ({
+                          dayOfWeek: d,
+                          startTime: "09:00",
+                          endTime: "17:00",
+                        })),
+                    duration,
+                    bookedSet,
+                    3,
+                  );
+                  const usingDefault = availRows.length === 0;
 
+                  return (
+                    <div className="mb-4 rounded-[var(--r)] border border-border bg-muted-bg/30 px-3 py-2.5">
+                      <div className="mb-1.5 flex items-center justify-between">
+                        <span className="text-[10.5px] font-semibold uppercase tracking-wider text-text-2">
+                          Next available
+                        </span>
+                        {!hasAvailability && (
+                          <span className="rounded-full bg-muted-bg-2 px-1.5 py-0.5 text-[9.5px] font-semibold uppercase text-text-2">
+                            Default hours
+                          </span>
+                        )}
+                      </div>
+                      {nextSlots.length === 0 ? (
+                        <p className="text-[12px] italic text-text-3">
+                          No upcoming slots
+                        </p>
+                      ) : (
+                        <>
+                          <div className="mb-1 text-[12px] font-medium text-text">
+                            {formatDayShort(nextSlots[0])} at{" "}
+                            {formatTimeShort(nextSlots[0])}
+                          </div>
+                          <div className="flex flex-wrap gap-1">
+                            {nextSlots.map((s) => (
+                              <span
+                                key={s.toISOString()}
+                                className="inline-flex rounded-full bg-card px-2 py-0.5 text-[10.5px] font-medium text-text-2 ring-1 ring-border"
+                              >
+                                {formatTimeShort(s)}
+                              </span>
+                            ))}
+                          </div>
+                          {usingDefault && (
+                            <p className="mt-1.5 text-[10.5px] text-text-3">
+                              Using default Mon–Fri 9–5 until hours are set.
+                            </p>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  );
+                })()}
+
+                {/* Primary action */}
                 <BookTimeButton
                   memberId={m.id}
                   memberName={m.name}
@@ -286,18 +393,24 @@ export default async function BookingPage({
                   viewerName={viewerDefaults.name}
                   viewerEmail={viewerDefaults.email}
                 />
-                {/* Legacy Calendly-style URL support — still shown as an extra
-                    link for anyone who prefers the external host. */}
-                {(m.publicBookingUrl ?? publicBookingUrl) && (
-                  <a
-                    href={m.publicBookingUrl ?? publicBookingUrl ?? "#"}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="mt-2 inline-flex items-center justify-center gap-1 text-[11.5px] font-medium text-pb-navy hover:underline"
-                  >
-                    Or open external link
-                  </a>
-                )}
+
+                {/* Tertiary actions — subtle footer row */}
+                <div className="mt-3 flex items-center justify-between text-[11.5px]">
+                  <ClearMemberAvailabilityButton
+                    memberId={m.id}
+                    memberName={m.name}
+                  />
+                  {(m.publicBookingUrl ?? publicBookingUrl) && (
+                    <a
+                      href={m.publicBookingUrl ?? publicBookingUrl ?? "#"}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="font-medium text-text-2 hover:text-pb-navy hover:underline"
+                    >
+                      External link ↗
+                    </a>
+                  )}
+                </div>
               </div>
             );
           })}
@@ -307,42 +420,3 @@ export default async function BookingPage({
   );
 }
 
-// ─── Pieces ───────────────────────────────────────────────────
-function FilterPill({
-  href,
-  isActive,
-  label,
-  initials,
-  showCheck,
-}: {
-  href: string;
-  isActive: boolean;
-  label: string;
-  initials?: string;
-  showCheck?: boolean;
-}) {
-  return (
-    <Link
-      href={href}
-      className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors ${
-        isActive
-          ? "bg-pb-navy text-white"
-          : "bg-muted-bg text-text-2 hover:bg-muted-bg-2 hover:text-text"
-      }`}
-    >
-      {showCheck && isActive && <Check className="h-3 w-3" />}
-      {initials && (
-        <span
-          className={`flex h-4 w-4 shrink-0 items-center justify-center rounded-full text-[9px] font-bold ${
-            isActive
-              ? "bg-white/15 text-white"
-              : "bg-muted-bg-2 text-text-2"
-          }`}
-        >
-          {initials}
-        </span>
-      )}
-      {label}
-    </Link>
-  );
-}
