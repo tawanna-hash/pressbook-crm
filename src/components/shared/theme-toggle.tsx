@@ -5,27 +5,37 @@ import { Moon, Sun } from "lucide-react";
 
 type Theme = "light" | "dark";
 
-function applyTheme(theme: Theme) {
-  const html = document.documentElement;
-  html.setAttribute("data-theme", theme);
-  try {
-    window.localStorage.setItem("pb-theme", theme);
-  } catch {
-    // storage disabled — fine, we just won't remember across sessions.
+function readCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const target = name + "=";
+  const cookies = document.cookie ? document.cookie.split("; ") : [];
+  for (const c of cookies) {
+    if (c.startsWith(target)) return decodeURIComponent(c.slice(target.length));
   }
+  return null;
+}
+
+function writeCookie(name: string, value: string) {
+  if (typeof document === "undefined") return;
+  // 1-year expiry, scoped to whole site, SameSite=Lax so it's sent on
+  // normal navigations. Not HttpOnly on purpose — we read it from JS
+  // here too.
+  const maxAge = 60 * 60 * 24 * 365;
+  document.cookie = `${name}=${encodeURIComponent(value)}; Path=/; Max-Age=${maxAge}; SameSite=Lax`;
+}
+
+function applyTheme(theme: Theme) {
+  document.documentElement.setAttribute("data-theme", theme);
+  writeCookie("pb-theme", theme);
 }
 
 function readInitial(): Theme {
-  if (typeof window === "undefined") return "light";
-  try {
-    const stored = window.localStorage.getItem("pb-theme");
-    if (stored === "dark" || stored === "light") return stored;
-  } catch {
-    /* ignore */
-  }
-  // Fall back to whatever the inline head script set (it reads localStorage +
-  // system preference).
-  const current = document.documentElement.getAttribute("data-theme");
+  const stored = readCookie("pb-theme");
+  if (stored === "dark" || stored === "light") return stored;
+  const current =
+    typeof document !== "undefined"
+      ? document.documentElement.getAttribute("data-theme")
+      : null;
   return current === "dark" ? "dark" : "light";
 }
 

@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Inter } from "next/font/google";
-import Script from "next/script";
+import { cookies } from "next/headers";
 import { ClerkProvider } from "@clerk/nextjs";
 import "./globals.css";
 
@@ -16,24 +16,33 @@ export const metadata: Metadata = {
   description: "CRM for Caxton Publications — RealtyLine & Newsline SA",
 };
 
-// Inline script — runs BEFORE React hydration to prevent a flash of the
-// wrong theme. Reads from localStorage, falls back to system preference.
-const NO_FLASH_SCRIPT = `(function(){try{var s=localStorage.getItem('pb-theme');var d=window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches;var t=(s==='dark'||s==='light')?s:(d?'dark':'light');document.documentElement.setAttribute('data-theme',t);}catch(e){}})();`;
-
-export default function RootLayout({
+/**
+ * Theme is stored in a cookie (`pb-theme`) and read server-side so the
+ * correct `data-theme` is present on the first HTML byte — no inline
+ * script needed, no flash of the wrong theme. First-time visitors with
+ * no cookie default to light; they can toggle in the UI, which writes
+ * the cookie via document.cookie and then flips `data-theme` on the
+ * live document.
+ */
+export default async function RootLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
+  const cookieStore = await cookies();
+  const cookieTheme = cookieStore.get("pb-theme")?.value;
+  const theme: "light" | "dark" =
+    cookieTheme === "dark" ? "dark" : "light";
+
   return (
     <ClerkProvider>
-      <html lang="en" className={inter.variable} suppressHydrationWarning>
-        <body className="antialiased font-sans">
-          <Script id="pb-theme-init" strategy="beforeInteractive">
-            {NO_FLASH_SCRIPT}
-          </Script>
-          {children}
-        </body>
+      <html
+        lang="en"
+        data-theme={theme}
+        className={inter.variable}
+        suppressHydrationWarning
+      >
+        <body className="antialiased font-sans">{children}</body>
       </html>
     </ClerkProvider>
   );
