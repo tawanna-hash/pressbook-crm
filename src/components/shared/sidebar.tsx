@@ -8,7 +8,7 @@ import {
   LayoutDashboard, Check, CalendarClock, CalendarDays,
   BookOpen, Clock, Inbox, Briefcase, UserMinus, Home,
   CheckCircle2, Sparkles, CircleSlash, History, LayoutGrid,
-  Building2, ExternalLink,
+  Building2, ExternalLink, ShieldCheck,
 } from "lucide-react";
 import { useTransition } from "react";
 import { switchOrg } from "@/app/(dashboard)/org-actions";
@@ -76,6 +76,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/calendar",   label: "Calendar",       icon: Calendar },
   { href: "/settings/company", label: "Company Profile", icon: Building2 },
   { href: "/settings/staff",   label: "Staff",           icon: Users },
+  { href: "/back-office/portals", label: "Back Office: Portals", icon: ShieldCheck },
   { href: "/portal",     label: "View Client Portal", icon: ExternalLink },
 ];
 

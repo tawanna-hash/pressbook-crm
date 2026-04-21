@@ -4,6 +4,18 @@ import { db } from "@/lib/db";
 import { contacts, organizations, users } from "@/lib/db/schema";
 import { getActiveOrg } from "@/lib/auth/active-org";
 import { getPortalRole } from "@/lib/auth/role";
+import { getImpersonatedContactId } from "@/lib/auth/impersonation";
+
+/**
+ * Describes an active back-office impersonation session — when a staff
+ * member is viewing the portal AS a specific client. Used by the portal
+ * layout to show a clear banner and exit control.
+ */
+export type ImpersonationMarker = {
+  actorClerkId: string;
+  actorEmail: string;
+  actorName: string | null;
+};
 
 export type PortalContext =
   | {
@@ -12,6 +24,8 @@ export type PortalContext =
       clerkEmail: string;
       contact: typeof contacts.$inferSelect;
       org: typeof organizations.$inferSelect;
+      /** Present when a staff member is impersonating this client. */
+      impersonation?: ImpersonationMarker;
     }
   | {
       role: "staff";
@@ -98,6 +112,40 @@ export async function getPortalContext(): Promise<PortalContext> {
       .limit(1);
     const org = orgRows[0];
     if (!org) return { role: "unknown", clerkId, clerkEmail };
+
+    // Back-office impersonation: if the staff member has started
+    // impersonating a specific client, return a "client" context keyed
+    // to that contact — but only if the contact lives in the staff's
+    // active org. Otherwise ignore a stale cookie and fall back to the
+    // normal staff preview.
+    const impersonatedId = await getImpersonatedContactId();
+    if (impersonatedId) {
+      const [target] = await db
+        .select()
+        .from(contacts)
+        .where(
+          and(
+            eq(contacts.id, impersonatedId),
+            eq(contacts.orgId, activeOrg.id),
+          ),
+        )
+        .limit(1);
+      if (target) {
+        return {
+          role: "client",
+          clerkId,
+          clerkEmail,
+          contact: target,
+          org,
+          impersonation: {
+            actorClerkId: clerkId,
+            actorEmail: clerkEmail,
+            actorName: u.name ?? null,
+          },
+        };
+      }
+    }
+
     return { role: "staff", clerkId, clerkEmail, user: u, org };
   }
 

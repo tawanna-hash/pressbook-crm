@@ -7,6 +7,7 @@ import {
   MessageSquare,
 } from "lucide-react";
 import { resolveCurrentContact } from "@/lib/auth/contact";
+import { getPortalContext } from "@/lib/auth/portal-context";
 
 const STAT_CARDS = [
   { label: "Open Tasks",      value: "—", icon: ListTodo,      color: "#021D40" },
@@ -24,8 +25,19 @@ function greetingFor(date: Date): string {
 
 export default async function PortalDashboardPage() {
   const user = await currentUser();
-  const resolution = await resolveCurrentContact();
   const greeting = greetingFor(new Date());
+
+  // Back-office impersonation short-circuit: when a staff user is
+  // impersonating a client, getPortalContext returns role:"client" with
+  // the target contact. Skip resolveCurrentContact (which would try to
+  // match the staff's own email to a client record and fail).
+  const ctx = await getPortalContext();
+  const impersonatedContact =
+    ctx.role === "client" && ctx.impersonation ? ctx.contact : null;
+
+  const resolution = impersonatedContact
+    ? ({ status: "linked", contact: impersonatedContact } as const)
+    : await resolveCurrentContact();
 
   // If this Clerk user doesn't have a matching CRM contact yet, show a
   // pending-activation screen instead of the dashboard. Staff needs to
