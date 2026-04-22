@@ -99,7 +99,11 @@ export default async function PortalBillingPage({
                   [a.companyName, a.adSize, a.frequency].filter(Boolean).join(" · ") ||
                   a.type ||
                   "Agreement";
-                const isPaid = Boolean(a.stripeInvoiceId);
+                // paidAt is set by the Stripe webhook on
+                // checkout.session.completed. stripeInvoiceId is retained
+                // as a fallback for historical rows where paidAt wasn't
+                // backfilled.
+                const isPaid = Boolean(a.paidAt) || Boolean(a.stripeInvoiceId);
                 const canPay =
                   !isPaid && a.status !== "cancelled" && amt && amt > 0;
                 return (

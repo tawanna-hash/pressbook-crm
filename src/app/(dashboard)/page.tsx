@@ -13,7 +13,7 @@ import {
   UserPlus,
 } from "lucide-react";
 import { db } from "@/lib/db";
-import { contacts } from "@/lib/db/schema";
+import { contacts, portalMagicLinks } from "@/lib/db/schema";
 import { getActiveOrg } from "@/lib/auth/active-org";
 import { Button, buttonClasses } from "@/components/ui/button";
 
@@ -57,12 +57,19 @@ export default async function DashboardPage() {
     ? and(eq(contacts.type, "client"), eq(contacts.orgId, activeOrg.id))
     : eq(contacts.type, "client");
 
+  // Portal user count is now "distinct contacts who have consumed at
+  // least one magic link" — clients don't have Clerk accounts anymore.
   const [counts] = await db
     .select({
       total:    sql<number>`count(*)::int`,
       active:   sql<number>`count(*) filter (where ${contacts.status} = 'active')::int`,
       prospect: sql<number>`count(*) filter (where ${contacts.status} = 'prospect')::int`,
-      portal:   sql<number>`count(*) filter (where ${contacts.clerkId} is not null)::int`,
+      portal:   sql<number>`(
+        SELECT COUNT(DISTINCT ${portalMagicLinks.contactId})::int
+        FROM ${portalMagicLinks}
+        WHERE ${portalMagicLinks.consumedAt} IS NOT NULL
+        ${activeOrg ? sql`AND ${portalMagicLinks.orgId} = ${activeOrg.id}` : sql``}
+      )`,
     })
     .from(contacts)
     .where(baseScope);
@@ -85,27 +92,43 @@ export default async function DashboardPage() {
     .orderBy(desc(contacts.createdAt))
     .limit(5);
 
-  // ── Recently activated portal logins (last 5) ─────────────
-  const recentlyActivated = await db
+  // ── Recently opened portals (last 5 magic-link consumptions) ─
+  // Joined against contacts so we display the client's name/avatar,
+  // keyed by when they actually clicked the link (not when the row was
+  // created). Multiple clicks per contact will collapse because we
+  // limit to 5 most recent rows overall; an additional DISTINCT ON is
+  // overkill for a dashboard widget.
+  const recentlyActivatedRaw = await db
     .select({
-      id:                 contacts.id,
-      avatarUrl:          contacts.avatarUrl,
-      firstName:          contacts.firstName,
-      lastName:           contacts.lastName,
-      portalActivatedAt:  contacts.portalActivatedAt,
+      id:          contacts.id,
+      avatarUrl:   contacts.avatarUrl,
+      firstName:   contacts.firstName,
+      lastName:    contacts.lastName,
+      consumedAt:  portalMagicLinks.consumedAt,
     })
-    .from(contacts)
+    .from(portalMagicLinks)
+    .innerJoin(contacts, eq(contacts.id, portalMagicLinks.contactId))
     .where(
       activeOrg
         ? and(
+            eq(portalMagicLinks.orgId, activeOrg.id),
             eq(contacts.type, "client"),
-            eq(contacts.orgId, activeOrg.id),
-            isNotNull(contacts.portalActivatedAt),
+            isNotNull(portalMagicLinks.consumedAt),
           )
-        : and(eq(contacts.type, "client"), isNotNull(contacts.portalActivatedAt)),
+        : and(eq(contacts.type, "client"), isNotNull(portalMagicLinks.consumedAt)),
     )
-    .orderBy(desc(contacts.portalActivatedAt))
-    .limit(5);
+    .orderBy(desc(portalMagicLinks.consumedAt))
+    .limit(20);
+
+  // Dedupe — keep the most recent consumption per contact, then take 5.
+  const seen = new Set<string>();
+  const recentlyActivated = recentlyActivatedRaw
+    .filter((r) => {
+      if (seen.has(r.id)) return false;
+      seen.add(r.id);
+      return true;
+    })
+    .slice(0, 5);
 
   const KPI_CARDS = [
     {
@@ -292,7 +315,7 @@ export default async function DashboardPage() {
           <div className="flex items-center gap-2 border-b border-border px-6 py-4">
             <ShieldCheck className="h-4 w-4 text-pb-green" />
             <h2 className="text-base font-semibold text-foreground">
-              Recent Portal Activations
+              Recent Portal Opens
             </h2>
           </div>
 
@@ -335,9 +358,9 @@ export default async function DashboardPage() {
                         <div className="truncate text-sm font-medium text-foreground">
                           {name}
                         </div>
-                        {c.portalActivatedAt && (
+                        {c.consumedAt && (
                           <div className="text-xs text-muted">
-                            {timeAgo(c.portalActivatedAt)}
+                            {timeAgo(c.consumedAt)}
                           </div>
                         )}
                       </div>

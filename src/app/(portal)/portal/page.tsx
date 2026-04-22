@@ -1,12 +1,12 @@
-import { currentUser } from "@clerk/nextjs/server";
+import { redirect } from "next/navigation";
 import {
-  AlertCircle,
   FolderOpen,
   Inbox,
+  KeyRound,
   ListTodo,
+  Mail,
   MessageSquare,
 } from "lucide-react";
-import { resolveCurrentContact } from "@/lib/auth/contact";
 import { getPortalContext } from "@/lib/auth/portal-context";
 
 const STAT_CARDS = [
@@ -24,78 +24,62 @@ function greetingFor(date: Date): string {
 }
 
 export default async function PortalDashboardPage() {
-  const user = await currentUser();
-  const greeting = greetingFor(new Date());
-
-  // Back-office impersonation short-circuit: when a staff user is
-  // impersonating a client, getPortalContext returns role:"client" with
-  // the target contact. Skip resolveCurrentContact (which would try to
-  // match the staff's own email to a client record and fail).
   const ctx = await getPortalContext();
-  const impersonatedContact =
-    ctx.role === "client" && ctx.impersonation ? ctx.contact : null;
 
-  const resolution = impersonatedContact
-    ? ({ status: "linked", contact: impersonatedContact } as const)
-    : await resolveCurrentContact();
-
-  // If this Clerk user doesn't have a matching CRM contact yet, show a
-  // pending-activation screen instead of the dashboard. Staff needs to
-  // add them as a contact with a matching email first.
-  if (resolution.status === "not_found") {
+  // No valid portal session and not staff — the visitor needs a fresh
+  // magic link from their agency. We don't render the CRM here;
+  // clients should arrive via an email link.
+  if (ctx.role === "unauthenticated" || ctx.role === "unknown") {
     return (
-      <div className="mx-auto max-w-xl py-12">
-        <div className="rounded-xl border border-border bg-card p-8 shadow-sm">
-          <div
-            className="mb-4 flex h-12 w-12 items-center justify-center rounded-full"
-            style={{ backgroundColor: "rgba(245, 158, 11, 0.12)" }}
-          >
-            <AlertCircle className="h-6 w-6 text-pb-amber" />
-          </div>
-          <h1 className="mb-2 text-2xl font-bold text-foreground">
-            Your portal isn&rsquo;t activated yet
-          </h1>
-          <p className="mb-4 text-sm leading-relaxed text-muted">
-            We don&rsquo;t have a client record matching{" "}
-            {resolution.email ? (
-              <span className="font-medium text-foreground">
-                {resolution.email}
-              </span>
-            ) : (
-              "your email"
-            )}{" "}
-            yet. Please reach out to your PressBook 360 account team so they
-            can add you to the CRM. Once they do, refresh this page and
-            you&rsquo;ll be in.
-          </p>
-          <p className="text-xs text-muted">
-            If you think this is a mistake, make sure you signed up with the
-            email your team uses for you.
-          </p>
+      <div className="mt-8 rounded-[var(--rlg)] border border-border bg-card p-8 shadow-[var(--sh-xs)]">
+        <div className="mb-3 flex h-10 w-10 items-center justify-center rounded-full bg-[rgba(2,29,64,0.08)]">
+          <Mail className="h-5 w-5 text-pb-navy" />
+        </div>
+        <h1 className="mb-1 text-2xl font-bold text-text">Check your inbox</h1>
+        <p className="text-[13.5px] leading-relaxed text-text-2">
+          Your client portal opens through a one-time link from your agency
+          — there&rsquo;s no password to remember. If you don&rsquo;t see a
+          recent email from us, reply to your most recent message and ask
+          for a fresh link. It lands in your inbox in seconds.
+        </p>
+        <div className="mt-4 flex items-center gap-2 text-[12px] text-text-3">
+          <KeyRound className="h-3.5 w-3.5" />
+          Each link works once. Close the browser tab and you&rsquo;ll need
+          a new link to return.
         </div>
       </div>
     );
   }
 
-  // At this point: status === "linked"
-  const contact = resolution.status === "linked" ? resolution.contact : null;
-  const greetingName =
-    contact?.firstName || user?.firstName || "there";
-  const activatedToday =
-    contact?.portalActivatedAt &&
-    new Date(contact.portalActivatedAt).toDateString() ===
-      new Date().toDateString();
+  // First-run onboarding: real (non-impersonated) clients who haven't
+  // finished the welcome screen go through it before seeing the
+  // dashboard. Staff preview and impersonation skip this — it's a
+  // client-only experience.
+  if (
+    ctx.role === "client" &&
+    !ctx.impersonation &&
+    !ctx.contact.portalOnboardedAt
+  ) {
+    redirect("/portal/welcome");
+  }
+
+  // At this point ctx is "client" (real or impersonated) or "staff".
+  const greeting = greetingFor(new Date());
+  const contact =
+    ctx.role === "client" ? ctx.contact : null;
+  const greetingName = contact?.firstName || "there";
+  const isImpersonating = ctx.role === "client" && Boolean(ctx.impersonation);
 
   return (
     <div>
       <div className="mb-8">
-        <h1 className="text-3xl font-extrabold text-foreground">
+        <h1 className="text-3xl font-extrabold text-text">
           {greeting}, {greetingName}!
         </h1>
-        <p className="mt-1 text-sm text-muted">
-          {activatedToday
-            ? "Welcome to your portal — you&rsquo;re all set up."
-            : "Here's what's happening with your projects today."}
+        <p className="mt-1 text-sm text-text-2">
+          {isImpersonating
+            ? "Staff view — showing this client's portal dashboard."
+            : "Here's what's happening with your account today."}
         </p>
       </div>
 
@@ -115,10 +99,8 @@ export default async function PortalDashboardPage() {
                 <Icon className="h-5 w-5" style={{ color: card.color }} />
               </div>
               <div>
-                <div className="text-2xl font-bold text-foreground">
-                  {card.value}
-                </div>
-                <div className="text-xs text-muted">{card.label}</div>
+                <div className="text-2xl font-bold text-text">{card.value}</div>
+                <div className="text-xs text-text-2">{card.label}</div>
               </div>
             </div>
           );
@@ -127,40 +109,38 @@ export default async function PortalDashboardPage() {
 
       {contact && (
         <div className="max-w-2xl rounded-xl border border-border bg-card p-6 shadow-sm">
-          <h2 className="mb-3 text-lg font-semibold text-foreground">
-            Your account
-          </h2>
+          <h2 className="mb-3 text-lg font-semibold text-text">Your account</h2>
           <dl className="grid grid-cols-1 gap-3 text-sm sm:grid-cols-2">
             <div>
-              <dt className="text-xs uppercase tracking-wide text-muted">
+              <dt className="text-xs uppercase tracking-wide text-text-2">
                 Name
               </dt>
-              <dd className="mt-1 text-foreground">
+              <dd className="mt-1 text-text">
                 {[contact.firstName, contact.lastName]
                   .filter(Boolean)
                   .join(" ") || "—"}
               </dd>
             </div>
             <div>
-              <dt className="text-xs uppercase tracking-wide text-muted">
+              <dt className="text-xs uppercase tracking-wide text-text-2">
                 Email
               </dt>
-              <dd className="mt-1 text-foreground">{contact.email || "—"}</dd>
+              <dd className="mt-1 text-text">{contact.email || "—"}</dd>
             </div>
             {contact.company && (
               <div>
-                <dt className="text-xs uppercase tracking-wide text-muted">
+                <dt className="text-xs uppercase tracking-wide text-text-2">
                   Company
                 </dt>
-                <dd className="mt-1 text-foreground">{contact.company}</dd>
+                <dd className="mt-1 text-text">{contact.company}</dd>
               </div>
             )}
             {contact.phone && (
               <div>
-                <dt className="text-xs uppercase tracking-wide text-muted">
+                <dt className="text-xs uppercase tracking-wide text-text-2">
                   Phone
                 </dt>
-                <dd className="mt-1 text-foreground">{contact.phone}</dd>
+                <dd className="mt-1 text-text">{contact.phone}</dd>
               </div>
             )}
           </dl>

@@ -1,5 +1,4 @@
 import Link from "next/link";
-import { redirect } from "next/navigation";
 import { PortalSidebar } from "@/components/shared/portal-sidebar";
 import { getPortalContext } from "@/lib/auth/portal-context";
 import { stopImpersonation } from "@/app/(dashboard)/back-office/portals/actions";
@@ -11,19 +10,15 @@ export default async function PortalLayout({
 }) {
   const ctx = await getPortalContext();
 
-  if (ctx.role === "unauthenticated") {
-    redirect("/sign-in?redirect=/portal");
-  }
-
-  if (ctx.role === "unknown") {
+  // Unauthenticated and "unknown" users don't get the client portal
+  // shell (sidebar, banner). Each child page decides how to handle an
+  // unauthenticated visitor — typically by showing a small "ask your
+  // agency for a fresh link" card. This also lets /portal/enter render
+  // bare while it consumes its token.
+  if (ctx.role === "unauthenticated" || ctx.role === "unknown") {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center p-10 text-center">
-        <h1 className="mb-2 text-2xl font-bold text-text">Account not linked</h1>
-        <p className="max-w-md text-[13px] text-text-2">
-          You&apos;re signed in as <span className="font-semibold">{ctx.clerkEmail}</span>,
-          but we don&apos;t have a client or staff record for that address yet.
-          Contact your agency rep to finish setup.
-        </p>
+      <div className="min-h-screen bg-muted-bg px-4 py-10">
+        <div className="mx-auto max-w-2xl">{children}</div>
       </div>
     );
   }

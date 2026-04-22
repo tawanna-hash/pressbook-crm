@@ -1,11 +1,15 @@
-import { and, asc, eq } from "drizzle-orm";
-import { LogOut, ShieldCheck } from "lucide-react";
+import { and, asc, desc, eq } from "drizzle-orm";
+import { LogOut, Mail, ShieldCheck } from "lucide-react";
 import { db } from "@/lib/db";
-import { contacts } from "@/lib/db/schema";
+import { contacts, portalMagicLinks } from "@/lib/db/schema";
 import { getActiveOrg } from "@/lib/auth/active-org";
 import { getImpersonatedContactId } from "@/lib/auth/impersonation";
 import { Button } from "@/components/ui/button";
-import { startImpersonation, stopImpersonation } from "./actions";
+import {
+  sendMagicLink,
+  startImpersonation,
+  stopImpersonation,
+} from "./actions";
 
 export const dynamic = "force-dynamic";
 
@@ -17,9 +21,16 @@ type Row = {
   portalEmail: string | null;
   company: string | null;
   status: string | null;
-  clerkId: string | null;
-  portalActivatedAt: Date | null;
+  lastLinkSentAt: Date | null;
+  lastLinkConsumedAt: Date | null;
 };
+
+type SearchParams = Promise<{
+  linkForContact?: string;
+  url?: string;
+  delivery?: string;
+  deliveryReason?: string;
+}>;
 
 function fullName(r: Row): string {
   return [r.firstName, r.lastName].filter(Boolean).join(" ") || "—";
@@ -29,8 +40,14 @@ function portalEmailFor(r: Row): string {
   return r.portalEmail || r.email || "—";
 }
 
-export default async function BackOfficePortalsPage() {
+export default async function BackOfficePortalsPage({
+  searchParams,
+}: {
+  searchParams: SearchParams;
+}) {
   const org = await getActiveOrg();
+  const { linkForContact, url, delivery, deliveryReason } = await searchParams;
+
   if (!org) {
     return (
       <div className="rounded-[var(--rlg)] border border-border bg-card p-12 text-center">
@@ -41,7 +58,7 @@ export default async function BackOfficePortalsPage() {
     );
   }
 
-  const rows: Row[] = await db
+  const contactRows = await db
     .select({
       id: contacts.id,
       firstName: contacts.firstName,
@@ -50,12 +67,44 @@ export default async function BackOfficePortalsPage() {
       portalEmail: contacts.portalEmail,
       company: contacts.company,
       status: contacts.status,
-      clerkId: contacts.clerkId,
-      portalActivatedAt: contacts.portalActivatedAt,
     })
     .from(contacts)
     .where(and(eq(contacts.orgId, org.id), eq(contacts.type, "client")))
     .orderBy(asc(contacts.firstName), asc(contacts.lastName));
+
+  // Most recent magic link per contact — used to show "link sent X ago"
+  // and whether the client has clicked through.
+  const linkRows = await db
+    .select({
+      contactId: portalMagicLinks.contactId,
+      createdAt: portalMagicLinks.createdAt,
+      consumedAt: portalMagicLinks.consumedAt,
+    })
+    .from(portalMagicLinks)
+    .where(eq(portalMagicLinks.orgId, org.id))
+    .orderBy(desc(portalMagicLinks.createdAt));
+
+  const lastLinkByContact = new Map<
+    string,
+    { sent: Date; consumed: Date | null }
+  >();
+  for (const l of linkRows) {
+    if (!lastLinkByContact.has(l.contactId)) {
+      lastLinkByContact.set(l.contactId, {
+        sent: l.createdAt,
+        consumed: l.consumedAt,
+      });
+    }
+  }
+
+  const rows: Row[] = contactRows.map((r) => {
+    const last = lastLinkByContact.get(r.id);
+    return {
+      ...r,
+      lastLinkSentAt: last?.sent ?? null,
+      lastLinkConsumedAt: last?.consumed ?? null,
+    };
+  });
 
   const activeImpersonationId = await getImpersonatedContactId();
   const activeRow =
@@ -93,6 +142,27 @@ export default async function BackOfficePortalsPage() {
         </div>
       )}
 
+      {linkForContact && url && (
+        <div className="rounded-[var(--r)] border border-[rgba(16,185,129,0.3)] bg-[rgba(16,185,129,0.06)] px-4 py-3 text-[13px] text-text">
+          <div className="mb-1 flex items-center gap-2 font-semibold text-pb-green">
+            <Mail className="h-4 w-4" />
+            {delivery === "sent"
+              ? "Magic link emailed."
+              : deliveryReason === "no_api_key"
+              ? "Link generated (Resend not configured — copy below)."
+              : deliveryReason === "no_recipient"
+              ? "Link generated, but this contact has no email on file."
+              : "Link generated (email provider didn't accept it — copy below)."}
+          </div>
+          <div className="break-all rounded-[var(--r)] bg-white px-3 py-2 font-mono text-[12px] text-text-2 border border-border">
+            {url}
+          </div>
+          <div className="mt-1.5 text-[11.5px] text-text-3">
+            One-time use · expires in 24h · tied to this client only.
+          </div>
+        </div>
+      )}
+
       <div className="overflow-hidden rounded-[var(--rlg)] border border-border bg-card shadow-[var(--sh-xs)]">
         <table className="w-full text-[13px]">
           <thead>
@@ -101,8 +171,8 @@ export default async function BackOfficePortalsPage() {
               <th className="px-4 py-2.5">Company</th>
               <th className="px-4 py-2.5">Portal Email</th>
               <th className="px-4 py-2.5">Status</th>
-              <th className="px-4 py-2.5">Portal</th>
-              <th className="px-4 py-2.5 text-right">Action</th>
+              <th className="px-4 py-2.5">Last Link</th>
+              <th className="px-4 py-2.5 text-right">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -114,8 +184,8 @@ export default async function BackOfficePortalsPage() {
               </tr>
             )}
             {rows.map((r) => {
-              const activated = Boolean(r.clerkId);
               const isActive = r.id === activeImpersonationId;
+              const hasEmail = Boolean(r.portalEmail || r.email);
               return (
                 <tr
                   key={r.id}
@@ -129,28 +199,38 @@ export default async function BackOfficePortalsPage() {
                   <td className="px-4 py-3">
                     <StatusPill status={r.status} />
                   </td>
-                  <td className="px-4 py-3">
-                    {activated ? (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-[rgba(16,185,129,0.12)] px-2 py-0.5 text-[11px] font-semibold text-pb-green">
-                        Activated
-                      </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-1 rounded-full bg-muted-bg-2 px-2 py-0.5 text-[11px] font-semibold text-text-2">
-                        Not Activated
-                      </span>
-                    )}
+                  <td className="px-4 py-3 text-[12px] text-text-2">
+                    <LinkStatus
+                      sentAt={r.lastLinkSentAt}
+                      consumedAt={r.lastLinkConsumedAt}
+                    />
                   </td>
                   <td className="px-4 py-3 text-right">
-                    <form action={startImpersonation} className="inline">
-                      <input type="hidden" name="contactId" value={r.id} />
-                      <Button
-                        type="submit"
-                        variant={isActive ? "secondary" : "primary"}
-                        size="sm"
-                      >
-                        {isActive ? "Re-open Portal" : "Open Portal As"}
-                      </Button>
-                    </form>
+                    <div className="inline-flex items-center gap-2">
+                      <form action={sendMagicLink} className="inline">
+                        <input type="hidden" name="contactId" value={r.id} />
+                        <Button
+                          type="submit"
+                          variant="secondary"
+                          size="sm"
+                          leftIcon={<Mail className="h-3.5 w-3.5" />}
+                          disabled={!hasEmail}
+                          title={hasEmail ? "Send magic link" : "No email on file"}
+                        >
+                          Send Link
+                        </Button>
+                      </form>
+                      <form action={startImpersonation} className="inline">
+                        <input type="hidden" name="contactId" value={r.id} />
+                        <Button
+                          type="submit"
+                          variant={isActive ? "secondary" : "primary"}
+                          size="sm"
+                        >
+                          {isActive ? "Re-open" : "Open As"}
+                        </Button>
+                      </form>
+                    </div>
                   </td>
                 </tr>
               );
@@ -159,6 +239,31 @@ export default async function BackOfficePortalsPage() {
         </table>
       </div>
     </div>
+  );
+}
+
+function LinkStatus({
+  sentAt,
+  consumedAt,
+}: {
+  sentAt: Date | null;
+  consumedAt: Date | null;
+}) {
+  if (!sentAt) return <span className="text-text-3">Never sent</span>;
+  const dateStr = sentAt.toLocaleDateString();
+  if (consumedAt) {
+    return (
+      <span>
+        <span className="font-semibold text-pb-green">Opened</span>
+        <span className="text-text-3"> · sent {dateStr}</span>
+      </span>
+    );
+  }
+  return (
+    <span>
+      <span className="font-semibold text-pb-amber">Sent</span>
+      <span className="text-text-3"> · {dateStr}</span>
+    </span>
   );
 }
 

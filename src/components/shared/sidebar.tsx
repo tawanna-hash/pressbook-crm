@@ -77,6 +77,7 @@ const NAV_ITEMS: NavItem[] = [
   { href: "/settings/company", label: "Company Profile", icon: Building2 },
   { href: "/settings/staff",   label: "Staff",           icon: Users },
   { href: "/back-office/portals", label: "Back Office: Portals", icon: ShieldCheck },
+  { href: "/back-office/forms",   label: "Back Office: Forms",   icon: FileText },
   { href: "/portal",     label: "View Client Portal", icon: ExternalLink },
 ];
 

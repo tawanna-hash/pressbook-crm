@@ -85,6 +85,90 @@ export const portalFiles = pgTable("portal_files", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// ── Portal magic links (passwordless client sessions) ────────
+// Clients never create accounts. Staff sends a single-use link to a
+// contact's email. The row holds both the link (preconsume) and the
+// session (postconsume) — token stays the same and is used as both the
+// URL param and the session cookie value.
+//
+//   link_expires_at     — hard expiry of the emailed link (e.g. 24h).
+//   consumed_at         — set on first click; a link can only be used once.
+//   session_expires_at  — set on consume = consumedAt + 4h; session dies
+//                         when this passes OR the cookie dies (browser
+//                         closes — cookie has no Max-Age). Honoring our
+//                         "each open needs a fresh link" rule.
+export const portalMagicLinks = pgTable("portal_magic_links", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id),
+  // No FK to contacts (declared later in the file — same pattern as
+  // portalFiles / portalFormAssignments).
+  contactId: uuid("contact_id").notNull(),
+  token: varchar("token", { length: 64 }).notNull().unique(),
+  linkExpiresAt: timestamp("link_expires_at").notNull(),
+  consumedAt: timestamp("consumed_at"),
+  sessionExpiresAt: timestamp("session_expires_at"),
+  createdByUserId: uuid("created_by_user_id"),
+  userAgent: text("user_agent"),
+  ipAddress: varchar("ip_address", { length: 45 }),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
+// ── Portal forms (templates) ──────────────────────────────────
+// Staff authors a form once (title + description + ordered list of
+// fields). Clients complete it via an assignment, which stores the
+// responses independently. A form is org-scoped and reusable across
+// many assignments.
+export type PortalFormFieldType =
+  | "text"
+  | "textarea"
+  | "email"
+  | "phone"
+  | "date"
+  | "select";
+
+export type PortalFormField = {
+  key: string;           // stable machine key, e.g. "business_name"
+  label: string;         // human label, e.g. "Business Name"
+  type: PortalFormFieldType;
+  required: boolean;
+  placeholder?: string;
+  /** For "select" only — list of options shown in the dropdown. */
+  options?: string[];
+};
+
+export const portalForms = pgTable("portal_forms", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  fields: jsonb("fields").$type<PortalFormField[]>().notNull().default([]),
+  createdByUserId: uuid("created_by_user_id"),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+  updatedAt: timestamp("updated_at").notNull().defaultNow(),
+});
+
+// ── Portal form assignments (per-contact instances) ──────────
+// An assignment is a single form sent to a single contact. Status
+// tracks progress; responses hold the submitted values keyed by each
+// field's `key`. submittedAt is non-null once the client submits.
+export type PortalFormResponses = Record<string, string | null>;
+
+export const portalFormAssignments = pgTable("portal_form_assignments", {
+  id: uuid("id").primaryKey().defaultRandom(),
+  orgId: uuid("org_id").notNull().references(() => organizations.id),
+  formId: uuid("form_id").notNull().references(() => portalForms.id),
+  // No FK to contacts here — contacts is declared further down the file
+  // (same pattern as portalFiles above). Integrity is enforced in app logic.
+  contactId: uuid("contact_id").notNull(),
+  // Status is a varchar (not enum) to keep the migration script cheap
+  // and make it trivial to add new states later.
+  status: varchar("status", { length: 20 }).notNull().default("assigned"),
+  responses: jsonb("responses").$type<PortalFormResponses>(),
+  assignedByUserId: uuid("assigned_by_user_id"),
+  assignedAt: timestamp("assigned_at").notNull().defaultNow(),
+  submittedAt: timestamp("submitted_at"),
+});
+
 // ── Users ─────────────────────────────────────────────────────
 // A signed-in Clerk user can belong to multiple orgs (one staff "seat"
 // per org), so clerk_id is NOT globally unique — only unique per org.
@@ -198,6 +282,9 @@ export const contacts = pgTable("contacts", {
   // Portal linkage
   clerkId: varchar("clerk_id", { length: 255 }).unique(),
   portalActivatedAt: timestamp("portal_activated_at"),
+  // Set when the client finishes the first-run onboarding screen; used
+  // to short-circuit future visits straight to the dashboard.
+  portalOnboardedAt: timestamp("portal_onboarded_at"),
   // Client relationship status — drives portal gate and list filtering.
   status: varchar("status", { length: 20 }).default("prospect"),
   // Primary contact person
@@ -270,6 +357,9 @@ export const agreements = pgTable("agreements", {
   stripePaymentIntentId: varchar("stripe_payment_intent_id", { length: 255 }),
   stripePaymentLinkUrl: text("stripe_payment_link_url"),
   isUploaded: boolean("is_uploaded").notNull().default(false),
+  // Set by the Stripe checkout.session.completed webhook — canonical
+  // indicator that this agreement has been paid in full.
+  paidAt: timestamp("paid_at"),
   auditLog: jsonb("audit_log")
     .$type<
       { event: string; timestamp: string; userEmail?: string; details?: string }[]
