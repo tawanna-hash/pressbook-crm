@@ -9,6 +9,12 @@ const isPublicRoute = createRouteMatcher([
   "/sign-in(.*)",
   "/sign-up(.*)",
   "/api/webhooks(.*)",
+  "/api/cron(.*)",
+  // Service-token-gated read-only exports used by the Caxton CRM
+  // importer. Each route validates `Authorization: Bearer
+  // $CRON_SECRET` itself; Clerk should not redirect them to /sign-in.
+  "/api/admin/export-agreements",
+  "/api/admin/export-invoices",
   "/portal(.*)",
 ]);
 
